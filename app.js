@@ -1,25 +1,24 @@
 (function(){
 const $=s=>document.getElementById(s);
 const canvas=$('wave'), ctx=canvas.getContext('2d');
-const LEAD=3; // real seconds of lead-in when there is no beat grid
-const LEAD_BEATS=8; // otherwise the lead-in is one eight-count
+const LEAD=3; // real seconds per eight-count of lead-in when there is no beat grid
 // a,b: the loop, or both null when there is no loop (then playback runs straight through).
 // zw: timeline view width in seconds (0 = not set yet), v0: view start.
 // beats, bpm: the beat grid, from analysis/<id>.json (empty = no grid).
 // one: index in beats of a beat that is a "1". It belongs to the song (from the analysis file), not to A.
-const S={a:20,b:44,rate:100,lead:true,snap:true,repeat:true,click:false,big:false,zw:0,v0:0,dur:0,peaks:null,pdur:0,beats:[],bpm:0,one:0,key:null};
+const S={a:20,b:44,rate:100,leadBeats:8,zw:0,v0:0,dur:0,peaks:null,pdur:0,beats:[],bpm:0,one:0,key:null};
 let dirty=true, drag=null, hoverX=null, wake=null, want=false;
 
 const store={get(k){try{return JSON.parse(localStorage.getItem(k))}catch(e){return null}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
-const PREFS=['rate','lead','snap','repeat','click','big'];
+const PREFS=['rate','leadBeats'];
 const prefs=store.get('cl:prefs'); if(prefs){for(const k of PREFS) if(k in prefs) S[k]=prefs[k];}
-function save(){const v={a:S.a,b:S.b,rate:S.rate,lead:S.lead,snap:S.snap,repeat:S.repeat,zw:S.zw};if(S.key)store.set(S.key,v);const p={};for(const k of PREFS)p[k]=S[k];store.set('cl:prefs',p);}
+function save(){const v={a:S.a,b:S.b,rate:S.rate,leadBeats:S.leadBeats,zw:S.zw};if(S.key)store.set(S.key,v);const p={};for(const k of PREFS)p[k]=S[k];store.set('cl:prefs',p);}
 
 const fmt=t=>{if(!isFinite(t))t=0;t=Math.max(0,t);const m=Math.floor(t/60),s=t-m*60;return m+':'+(s<10?'0':'')+s.toFixed(1)};
 const hasLoop=()=>S.a!==null;
-// where a round starts: one eight-count before A (3 real seconds without beats), A with the lead-in off, or the song's start with no loop
-const pre=()=>{if(!hasLoop())return 0;if(!S.lead)return S.a;if(!S.beats.length)return Math.max(0,S.a-LEAD*S.rate/100);
-  const i=nearestBeatIdx(S.a)-LEAD_BEATS;return Math.max(0,i>=0?S.beats[i]:S.a-LEAD_BEATS*beatLen())};
+// where a round starts: S.leadBeats beats before A (3 real seconds per eight without beats), A with no lead-in, or the song's start with no loop
+const pre=()=>{if(!hasLoop())return 0;const n=S.leadBeats;if(!n)return S.a;if(!S.beats.length)return Math.max(0,S.a-LEAD*n/8*S.rate/100);
+  const i=nearestBeatIdx(S.a)-n;return Math.max(0,i>=0?S.beats[i]:S.a-n*beatLen())};
 
 /* ---------- YouTube player ---------- */
 let yt=null, ytState=-1, ytReady=false, apiPromise=null, ytRates=[];
@@ -40,7 +39,7 @@ function checkYtRate(){if(!ytReady)return;const want=S.rate,got=Math.round(yt.ge
   if(!steps&&ytRates.length&&!ytRates.includes(want)){setSteps(ytRates);return}
   $('rateNote').textContent='YouTube is playing at '+got+'% instead of '+want+'%.'}
 function applyRate(){Yt.setRate(S.rate/100)}
-function onPlayState(playing){$('play').textContent=playing?'Pause':'Play';if(!playing){$('count').hidden=true;stopClicks();if(wake){wake.release().catch(()=>{});wake=null}}}
+function onPlayState(playing){$('play').textContent=playing?'Pause':'Play';if(!playing){$('count').hidden=true;if(wake){wake.release().catch(()=>{});wake=null}}}
 
 /* ---------- speed steps ---------- */
 let steps=null; // the speeds (percent, 50–150) the player allows when it can't do 5% steps
@@ -59,7 +58,7 @@ function probeYtRates(){
 /* ---------- beats ---------- */
 function nearestIdx(b,t){let lo=0,hi=b.length-1;if(hi<0)return -1;while(hi-lo>1){const m=(lo+hi)>>1;if(b[m]<t)lo=m;else hi=m}return Math.abs(b[lo]-t)<=Math.abs(b[hi]-t)?lo:hi}
 const nearestBeatIdx=t=>nearestIdx(S.beats,t);
-const useSnap=()=>S.snap&&S.beats.length>0;
+const useSnap=()=>S.beats.length>0;
 const oneIdx=()=>S.one;
 const countOf=(i,one)=>(((i-one)%8)+8)%8; // 0 means "1"
 function snap(t){if(useSnap())return S.beats[nearestBeatIdx(t)];return Math.round(t*10)/10}
@@ -85,19 +84,6 @@ function gotAnalysis(peaks,pdur,beats,bpm,one,saved){
   render();
 }
 
-/* ---------- lead-in click ---------- */
-let ac=null,clicks=[],clickArm=false;
-function audioCtx(){if(!ac){const AC=window.AudioContext||window.webkitAudioContext;if(!AC)return null;ac=new AC()}if(ac.state==='suspended')ac.resume().catch(()=>{});return ac}
-function beep(when,accent){const o=ac.createOscillator(),g=ac.createGain();o.frequency.value=accent?1760:1100;
-  g.gain.setValueAtTime(0.0001,when);g.gain.exponentialRampToValueAtTime(accent?0.6:0.35,when+0.004);g.gain.exponentialRampToValueAtTime(0.0001,when+0.06);
-  o.connect(g).connect(ac.destination);o.start(when);o.stop(when+0.07);clicks.push(o);o.onended=()=>{clicks=clicks.filter(x=>x!==o)}}
-function stopClicks(){for(const o of clicks)try{o.stop()}catch(e){}clicks=[]}
-// Called once per round when playback is running inside the lead-in: schedule clicks on the beats up to and including A (or once per real second without beats).
-function scheduleClicks(t){
-  if(!audioCtx())return;const r=S.rate/100,now=ac.currentTime+0.02;
-  if(S.beats.length){const one=oneIdx();for(let i=Math.max(0,nearestBeatIdx(t)-1);i<S.beats.length&&S.beats[i]<=S.a+0.03;i++){const b=S.beats[i];if(b>t+0.01)beep(now+(b-t)/r,countOf(i,one)===0)}}
-  else for(let k=LEAD;k>=0;k--){const b=S.a-k*r;if(b>t+0.01)beep(now+(b-t)/r,k===0)}
-}
 
 /* ---------- drawing ---------- */
 // The timeline works like a PDF page: a fixed scale you pan. Only the zoom buttons change the scale.
@@ -146,7 +132,7 @@ function draw(){
   const [v0,v1]=range(),span=Math.max(0.001,v1-v0),X=t=>(t-v0)/span*W;
   const top=36,mid=(top+H)/2,amp=(H-top)/2-3;
   const loop=hasLoop(),xa=X(S.a),xb=X(S.b),xp=X(pre());
-  if(loop){if(S.lead){ctx.fillStyle=tok(cs,'--tape-soft');ctx.globalAlpha=.45;ctx.fillRect(xp,top,xa-xp,H-top);ctx.globalAlpha=1}
+  if(loop){if(S.leadBeats){ctx.fillStyle=tok(cs,'--tape-soft');ctx.globalAlpha=.45;ctx.fillRect(xp,top,xa-xp,H-top);ctx.globalAlpha=1}
     ctx.fillStyle=tok(cs,'--tape-soft');ctx.fillRect(xa,top,xb-xa,H-top)}
   const mu=tok(cs,'--muted'),pps=W/span;
   // time ruler: m:ss labels at the first spacing on the ladder that leaves room for them
@@ -185,23 +171,21 @@ function render(){
   $('aTime').textContent=loop?fmt(S.a):'–';$('bTime').textContent=loop?fmt(S.b):'–';
   $('aCount').textContent=loop&&S.beats.length?' · count '+(countOf(nearestBeatIdx(S.a),oneIdx())+1):'';
   if(loop){const len=S.b-S.a;let beats='';if(S.beats.length){const n=S.beats.filter(b=>b>=S.a-0.03&&b<S.b-0.03).length;beats=' · '+n+' beats'}
-    $('loopSum').textContent='Loop length '+len.toFixed(1)+' s'+beats+(S.lead?' · lead-in starts at '+fmt(pre()):'')}
+    $('loopSum').textContent='Loop length '+len.toFixed(1)+' s'+beats+(S.leadBeats?' · lead-in starts at '+fmt(pre()):'')}
   else $('loopSum').textContent='No loop. Set A or B to the playhead to make one.';
-  for(const id of ['aMinus','aPlus','bMinus','bPlus','tLead','tRepeat','fitLoop'])$(id).disabled=!loop;
+  for(const id of ['aMinus','aPlus','bMinus','bPlus','fitLoop'])$(id).disabled=!loop;
   if(document.activeElement!==$('speedVal'))$('speedVal').value=S.rate+'%';$('speed').value=S.rate;$('speedBtn').textContent=S.rate+'%';
   for(const b of $('speedPop').querySelectorAll('[data-rate]'))b.setAttribute('aria-pressed',+b.dataset.rate===S.rate);
-  for(const [id,k] of [['tLead','lead'],['tSnap','snap'],['tRepeat','repeat'],['tClick','click'],['tBig','big']])$(id).setAttribute('aria-pressed',S[k]);
-  $('counter').classList.toggle('big',S.big);
+  for(const b of document.querySelectorAll('#leadSeg button')){b.setAttribute('aria-pressed',+b.dataset.n===S.leadBeats);b.disabled=!loop}
   const step=useSnap()?'beat':'second';for(const id of ['aMinus','aPlus','bMinus','bPlus'])$(id).title='Move one '+step;
   dirty=true;
 }
 
 async function lockScreen(){try{if('wakeLock'in navigator&&!wake){wake=await navigator.wakeLock.request('screen');wake.addEventListener('release',()=>wake=null)}}catch(e){}}
-function startLoop(){followHere();want=true;clickArm=true;Yt.seek(pre());applyRate();Yt.play()}
+function startLoop(){followHere();want=true;Yt.seek(pre());applyRate();Yt.play()}
 function togglePlay(){
-  if(S.click)audioCtx(); // unlock Web Audio inside the tap
   if(!Yt.paused()){want=false;Yt.pause();return}
-  const t=Yt.time();want=true;clickArm=true;followHere();
+  const t=Yt.time();want=true;followHere();
   if(hasLoop()&&(t<pre()-0.25||t>=S.b-0.05))startLoop();else{applyRate();Yt.play()}
   lockScreen();
   setTimeout(()=>{if(want&&Yt.paused())$('status').textContent="If the video doesn't start, tap the video itself once. After that, Play works from here."},2500);
@@ -236,13 +220,12 @@ function tick(){
   requestAnimationFrame(tick);
   if(!S.dur)return;
   const t=Yt.time(),playing=!Yt.paused();
-  if(playing&&hasLoop()&&t>=S.b){clickArm=true;if(S.repeat)Yt.seek(pre());else{want=false;Yt.pause();Yt.seek(pre())}}
-  else if(clickArm&&playing&&Yt.settled()){if(S.click&&S.lead&&hasLoop()&&t<S.a&&t>=pre()-0.3)scheduleClicks(t);clickArm=false}
+  if(playing&&hasLoop()&&t>=S.b)Yt.seek(pre());
   ytWatch(performance.now());
   updateCounter(t);
   followHead(t);
   const c=$('count');
-  if(playing&&S.lead&&hasLoop()&&!S.beats.length&&t<S.a-0.02&&t>=pre()-0.3){const n=Math.ceil((S.a-t)/(S.rate/100));const s=String(Math.max(1,Math.min(LEAD,n)));if(c.textContent!==s)c.textContent=s;c.hidden=false}else if(!c.hidden)c.hidden=true;
+  if(playing&&S.leadBeats&&hasLoop()&&!S.beats.length&&t<S.a-0.02&&t>=pre()-0.3){const n=Math.ceil((S.a-t)/(S.rate/100));const s=String(Math.max(1,n));if(c.textContent!==s)c.textContent=s;c.hidden=false}else if(!c.hidden)c.hidden=true;
   $('now').textContent=fmt(t);
   if(playing||dirty)draw();
 }
@@ -301,17 +284,13 @@ canvas.addEventListener('wheel',ev=>{
 },{passive:false});
 
 /* ---------- controls ---------- */
-function restart(){if(S.click)audioCtx();startLoop();lockScreen()}
+function restart(){startLoop();lockScreen()}
 $('play').onclick=togglePlay;$('restart').onclick=restart;
 $('speed').oninput=e=>setRate(+e.target.value);
 $('aMinus').onclick=()=>setA(nudge(S.a,-1));$('aPlus').onclick=()=>setA(nudge(S.a,1));
 $('bMinus').onclick=()=>setB(nudge(S.b,-1));$('bPlus').onclick=()=>setB(nudge(S.b,1));
 $('aHere').onclick=()=>setA(snap(Yt.time()));$('bHere').onclick=()=>setB(snap(Yt.time()));
-$('tLead').onclick=()=>{S.lead=!S.lead;render();save()};
-$('tRepeat').onclick=()=>{S.repeat=!S.repeat;render();save()};
-$('tClick').onclick=()=>{S.click=!S.click;if(S.click)audioCtx();render();save()};
-$('tBig').onclick=()=>{S.big=!S.big;render();save()};
-$('tSnap').onclick=()=>{S.snap=!S.snap;snapAB();render();save()};
+for(const b of document.querySelectorAll('#leadSeg button'))b.onclick=()=>{S.leadBeats=+b.dataset.n;render();save()};
 $('undo').onclick=undo;
 // Typed speed: the percentage is an input. Commit on Enter or blur (setRate clamps and rounds); Escape or junk reverts.
 {const sv=$('speedVal');let cancel=false;
@@ -341,7 +320,7 @@ new MutationObserver(()=>dirty=true).observe(document.documentElement,{attribute
 function showApp(){$('empty').hidden=true;$('app').hidden=false;$('transport').hidden=false}
 function restore(key){
   S.key=key;const saved=store.get(key);S.zw=0;clearUndo();
-  if(saved){for(const k of ['a','b','rate','lead','snap','repeat','zw'])if(k in saved)S[k]=saved[k]}
+  if(saved){for(const k of ['a','b','rate','leadBeats','zw'])if(k in saved)S[k]=saved[k]}
   else{if(S.dur>=46){S.a=20;S.b=44}else{S.a=0;S.b=Math.min(S.dur||8,8)}}
   if(S.a===null||S.b===null)S.a=S.b=null; // no loop
   else{S.b=Math.min(S.b,S.dur||S.b);S.a=Math.max(0,Math.min(S.a,S.b-0.5))}
@@ -388,7 +367,7 @@ async function loadYt(id){
         if(s===3)bufAt=now;
         if(s===1){if(!S.dur){S.dur=yt.getDuration()||0;render()}applyRate();if(pend!==null){const t=pend;pend=null;Yt.seek(t)}}
         if(s===2&&now-seekAt>3000)want=false; // paused from the YouTube player's own controls
-        if(s===0&&want){if(S.repeat&&hasLoop())startLoop();else{want=false;Yt.seek(pre())}}
+        if(s===0&&want){if(hasLoop())startLoop();else{want=false;Yt.seek(pre())}}
         onPlayState(s===1||s===3);dirty=true},
       onPlaybackRateChange:()=>checkYtRate(),
       onError:ev=>{const m=YT_ERR[ev.data]||'YouTube could not play this video (error '+ev.data+').';

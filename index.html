@@ -55,6 +55,7 @@
           <button id="fitLoop" title="Show the whole loop">Fit loop</button>
           <button id="fitSong" title="Show the whole song">Fit song</button>
         </div>
+        <div class="seg lead" id="leadSeg" role="group" aria-label="Lead-in beats before A"><span>Lead-in</span><button data-n="0">0</button><button data-n="8">8</button><button data-n="16">16</button></div>
         <div class="speed">
           <button id="speedBtn" class="speed-btn" aria-haspopup="dialog" aria-expanded="false" aria-controls="speedPop" title="Playback speed">100%</button>
           <div id="speedPop" class="speed-pop" role="dialog" aria-label="Speed" hidden>
@@ -96,15 +97,6 @@
       <div class="loop-foot"><div id="loopSum" class="loop-sum"></div><button id="undo" disabled>Undo</button></div>
     </div>
 
-    <div class="panel">
-      <div class="toggles">
-        <button id="tLead" class="tog" aria-pressed="true">Lead-in</button>
-        <button id="tSnap" class="tog" aria-pressed="true">Snap to beats</button>
-        <button id="tRepeat" class="tog" aria-pressed="true">Repeat</button>
-        <button id="tClick" class="tog" aria-pressed="false">Lead-in click</button>
-        <button id="tBig" class="tog" aria-pressed="false">Big count</button>
-      </div>
-    </div>
   </section>
 </main>
 

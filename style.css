@@ -66,10 +66,6 @@ canvas{display:block;width:100%;height:136px;border-radius:8px;background:var(--
 .counter .on{background:var(--tape-fill);color:var(--tape-ink)}
 .counter .cell.first.on{color:var(--tape-ink)}
 @media (max-width:420px){.counter .cell{font-size:24px}.counter .and{width:11px;font-size:11px}}
-/* big count: two rows of four, readable from across the room */
-.counter.big{flex-wrap:wrap;row-gap:6px}
-.counter.big .cell{flex:0 0 calc(25% - 20px);font-size:min(17vw,104px);padding-block:12px}
-.counter.big .and{width:20px;font-size:18px}
 
 /* loop points */
 .points{display:grid;grid-template-columns:1fr 1fr;gap:12px}
@@ -83,7 +79,9 @@ canvas{display:block;width:100%;height:136px;border-radius:8px;background:var(--
 button:disabled{opacity:.4;cursor:default}
 
 /* speed: a button in the timeline header that opens a small menu of presets plus a custom slider */
-.speed{position:relative;margin-left:auto}
+.lead{margin-left:auto;align-items:center}.lead span{padding:0 4px 0 10px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:700}.lead button{min-width:40px;padding:6px 8px}
+.lead button[aria-pressed="true"]{background:var(--tape-fill);color:var(--tape-ink)}
+.speed{position:relative}
 .speed-btn{min-height:36px;padding:4px 10px 4px 12px;font-family:var(--display);font-weight:700;font-size:20px;line-height:1;font-variant-numeric:tabular-nums}
 .speed-btn::after{content:"";width:7px;height:7px;border:solid var(--muted);border-width:0 2px 2px 0;transform:translateY(-2px) rotate(45deg);margin-left:2px}
 .speed-btn[aria-expanded="true"]{border-color:var(--tape)}
@@ -98,12 +96,6 @@ button:disabled{opacity:.4;cursor:default}
 input[type=range]{width:100%;min-width:0;accent-color:var(--tape);height:32px;margin:0}
 .rate-note{margin:-4px 0 8px}.rate-note:empty{display:none}
 
-/* toggles */
-.toggles{display:flex;flex-wrap:wrap;gap:8px}
-.tog{justify-content:flex-start}
-.tog::before{content:"";width:14px;height:14px;border-radius:4px;border:2px solid var(--muted);flex:none}
-.tog[aria-pressed="true"]{border-color:var(--tape)}
-.tog[aria-pressed="true"]::before{background:var(--tape-fill);border-color:var(--tape-fill)}
 
 /* transport */
 .transport{position:fixed;left:0;right:0;bottom:0;background:var(--surface);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px);z-index:5}
