@@ -7,7 +7,7 @@ It is built for one dancer practicing on an iPhone in Safari. It is a plain stat
 ## How to use it
 
 1. Paste a YouTube link and tap **Open**, or tap **Load clip** to open a video or audio file from your phone. A screen recording works.
-2. Drag the red A and B markers on the timeline to choose the section to loop. The ‹ and › buttons move a marker by one beat, and **Set to playhead** puts it where the video is now.
+2. Drag the red A and B markers on the timeline to choose the section to loop. The ‹ and › buttons move a marker by one beat, and **Set to playhead** puts it where the video is now. Drag anywhere else on the timeline to scroll it, and tap to jump there. The − and + buttons zoom out and in, **Fit loop** shows the whole loop, and **Fit song** shows the whole song. The zoom stays where you put it, and while the song plays the timeline turns a page when the playhead reaches the edge. Thin lines mark each "1".
 3. Set the speed and press **Play**. With the lead-in on, each loop starts 3 seconds before A.
 
 The count strip lights up the current count. "1" is the beat at A. If the counts are off:
