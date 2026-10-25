@@ -7,13 +7,13 @@ It is built for one dancer practicing on an iPhone in Safari. It is a plain stat
 ## How to use it
 
 1. Pick a song from the **Songs** list, or tap **Load clip** to open a video or audio file from your phone. A screen recording works. The list puts the song you used last at the top. After a song loads, the list folds up. Tap **Songs** to open it again.
-2. Drag the red A and B markers on the timeline to choose the section to loop. The ‹ and › buttons move a marker by one beat, and **Set to playhead** puts it where the video is now.
-3. Set the speed and press **Play**. With the lead-in on, each loop starts 3 seconds before A.
+2. Drag the red A and B markers on the timeline to choose the section to loop. The ‹ and › buttons move a marker by one beat, and **Set to playhead** puts it where the video is now. **Undo** puts the markers back where they were before your last change. Press it again to step further back.
+3. Set the speed and press **Play**. To type a speed, tap the percentage. With the lead-in on, each loop starts 3 seconds before A.
 
-The count strip lights up the current count. "1" is the beat at A. If the counts are off:
+The count strip lights up the current count. The "1" belongs to the song, so it stays on the same beat wherever you put A. The label next to A shows which count A is on. If the counts are off:
 
 - **½× tempo** and **2× tempo** fix a beat grid that runs at half or double the real speed.
-- **Move the 1** shifts which beat counts as "1" by one beat, without moving A.
+- **Move the 1** shifts which beat counts as "1" by one beat, for the whole song. Set it once and it stays.
 - **Tap beat** lets you tap along with the music to set your own beat grid. Your tapped grid wins over the detected beats. **Use detected** goes back to the detected beats.
 
 Other options are **Lead-in click**, which plays a click on each beat of the lead-in, and **Big count**, which makes the count strip large enough to read from across the room. Note that the iPhone silent switch mutes the click.
