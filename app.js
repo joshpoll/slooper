@@ -264,9 +264,14 @@ function tapAt(ev){const r=canvas.getBoundingClientRect(),now=performance.now(),
 // A press on the A or B tab drags that marker (one undo entry per drag). Any other press is a tap, unless it moves:
 // - Mouse or pen: dragging 4 px selects a new loop, like selecting text. Desktop pans with the wheel or trackpad instead.
 // - Touch: moving 6 px pans (and stops following), since touch has no wheel. Holding still for 400 ms switches to loop selection.
+// Shift+click with a mouse extends the loop like a text selection, without seeking: the nearer end (or the end on that side)
+// jumps to the click, and dragging on moves that same end. With no loop, it makes one from the playhead to the click.
 canvas.addEventListener('pointerdown',ev=>{
   if(!S.dur)return;const m=markerAt(ev),base={x:ev.clientX,t0:tAt(ev),mark:mark(),moved:false};
-  if(m)drag={...base,what:m};
+  if(ev.shiftKey&&ev.pointerType==='mouse'){const t=base.t0,h=Yt.time();let w;
+    if(hasLoop())w=t<S.a?'a':t>S.b?'b':t-S.a<S.b-t?'a':'b';else{selectTo(h,t);w=t<h?'a':'b'}
+    drag={...base,what:w};moveEnd(w,t)}
+  else if(m)drag={...base,what:m};
   else if(ev.pointerType==='touch'){drag={...base,what:'pan',v0:S.v0};const d=drag;
     d.timer=setTimeout(()=>{if(drag===d&&!d.moved){d.what='sel';d.moved=true;selectTo(d.t0,d.t0);if(navigator.vibrate)navigator.vibrate(10)}},400)}
   else drag={...base,what:'sel'};
@@ -279,9 +284,9 @@ canvas.addEventListener('pointermove',ev=>{
   if(drag.what==='pan'){if(!drag.moved&&Math.abs(dx)<6)return;
     if(!drag.moved){drag.moved=true;clearTimeout(drag.timer);setFollow(null)}S.v0=drag.v0-dx/canvas.getBoundingClientRect().width*vw();range();dirty=true;return}
   if(drag.what==='sel'){if(!drag.moved&&Math.abs(dx)<4)return;drag.moved=true;selectTo(drag.t0,tAt(ev));return}
-  const t=tAt(ev);
-  if(drag.what==='a'){S.a=Math.max(0,Math.min(snap(t),S.b-0.5))}else{S.b=Math.min(S.dur,Math.max(snap(t),S.a+0.5))}
-  render()});
+  moveEnd(drag.what,tAt(ev))});
+// Move loop end 'a' or 'b' to t, snapped, keeping the loop at least 0.5 s long.
+function moveEnd(w,t){if(w==='a')S.a=Math.max(0,Math.min(snap(t),S.b-0.5));else S.b=Math.min(S.dur,Math.max(snap(t),S.a+0.5));render()}
 const endDrag=ev=>{
   if(!drag)return;clearTimeout(drag.timer);
   if(drag.what==='a'||drag.what==='b'||(drag.what==='sel'&&drag.moved)){record(drag.mark);save()}
