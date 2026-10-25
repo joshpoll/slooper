@@ -133,8 +133,10 @@ def compute_beats(y: np.ndarray) -> tuple[float, list[float]]:
     # Track only over the non-silent span of the audio, with librosa's own
     # edge trimming off: on long tracks it can drop tens of seconds of loud
     # music at the end. Times are shifted back so they stay in media time.
+    # Onsets come from the kick-drum band only (below 150 Hz). Full-band onsets
+    # let loud hats and claps on the "&" pull the tracker half a beat off.
     start, end = librosa.effects.trim(y, top_db=SILENCE_DB)[1]
-    onset_env = librosa.onset.onset_strength(y=y[start:end], sr=SR, hop_length=HOP)
+    onset_env = librosa.onset.onset_strength(y=y[start:end], sr=SR, hop_length=HOP, fmax=150, n_mels=32)
     tempo, beat_frames = librosa.beat.beat_track(
         onset_envelope=onset_env, sr=SR, hop_length=HOP, start_bpm=START_BPM, trim=False
     )
