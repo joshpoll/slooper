@@ -150,9 +150,9 @@ function draw(){
   if(S.peaks&&S.peaks.length>1){const Pk=S.peaks,N=Pk.length,dur=S.pdur||S.dur||1,cw=tok(cs,'--wave'),ci=tok(cs,'--wave-in');
     // Columns sit on a fixed grid in song time (a power-of-two number of peaks wide, about 2 px), so panning
     // slides the waveform instead of re-bucketing it, and zooming only regroups at each doubling.
-    const pd=dur/N,cd=pd*Math.pow(2,Math.max(0,Math.round(Math.log2(2*span/W/pd)))),cw2=Math.max(1,cd*pps*0.75);
+    const pd=dur/N,cd=pd*Math.pow(2,Math.max(0,Math.round(Math.log2(2*span/W/pd)))),gap=cd*pps*d>=8?1:0; // a 1-device-pixel gap only when bars are wide enough; thinner bars touch, so no moiré
     for(let k=Math.floor(v0/cd);k*cd<=v1;k++){const t0=k*cd,i0=Math.round(t0/pd),i1=Math.round((t0+cd)/pd);let m=0;for(let i=Math.max(0,i0);i<Math.min(N,i1);i++)if(Pk[i]>m)m=Pk[i];
-      const h=Math.max(1,m*amp),t=t0+cd/2;ctx.fillStyle=(loop&&t>=S.a&&t<=S.b)?ci:cw;ctx.fillRect(X(t0),mid-h,cw2,2*h)}}
+      const h=Math.max(1,m*amp),t=t0+cd/2;ctx.fillStyle=(loop&&t>=S.a&&t<=S.b)?ci:cw;const x0=Math.round(X(t0)*d),x1=Math.round(X(t0+cd)*d);ctx.fillRect(x0/d,mid-h,Math.max(1,x1-x0-gap)/d,2*h)}}
   else{ctx.fillStyle=tok(cs,'--line');ctx.fillRect(0,mid,W,1)}
   if(loop){ctx.fillStyle=tok(cs,'--tape');ctx.fillRect(Math.round(xa)-1,0,2,H);ctx.fillRect(Math.round(xb)-1,0,2,H);
     ctx.fillStyle=tok(cs,'--tape-fill');ctx.fillRect(xa-1,0,20,18);ctx.fillRect(xb-19,0,20,18);
