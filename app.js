@@ -170,9 +170,6 @@ function render(){
   const loop=hasLoop();
   $('aTime').textContent=loop?fmt(S.a):'–';$('bTime').textContent=loop?fmt(S.b):'–';
   $('aCount').textContent=loop&&S.beats.length?' · count '+(countOf(nearestBeatIdx(S.a),oneIdx())+1):'';
-  if(loop){const len=S.b-S.a;let beats='';if(S.beats.length){const n=S.beats.filter(b=>b>=S.a-0.03&&b<S.b-0.03).length;beats=' · '+n+' beats'}
-    $('loopSum').textContent='Loop length '+len.toFixed(1)+' s'+beats+(S.leadBeats?' · lead-in starts at '+fmt(pre()):'')}
-  else $('loopSum').textContent='No loop. Set A or B to the playhead to make one.';
   for(const id of ['aMinus','aPlus','bMinus','bPlus','fitLoop'])$(id).disabled=!loop;
   if(document.activeElement!==$('speedVal'))$('speedVal').value=S.rate+'%';$('speed').value=S.rate;$('speedBtn').textContent=S.rate+'%';
   for(const b of $('speedPop').querySelectorAll('[data-rate]'))b.setAttribute('aria-pressed',+b.dataset.rate===S.rate);
@@ -253,6 +250,7 @@ function tapAt(ev){const r=canvas.getBoundingClientRect(),now=performance.now(),
 // Shift+click with a mouse extends the loop like a text selection, without seeking: the nearer end (or the end on that side)
 // jumps to the click, and dragging on moves that same end. With no loop, it makes one from the playhead to the click.
 canvas.addEventListener('pointerdown',ev=>{
+  document.activeElement?.blur?.(); // pointerdown's preventDefault keeps focus put; drop it so Space plays instead of pressing the last button
   if(!S.dur)return;const m=markerAt(ev),base={x:ev.clientX,t0:tAt(ev),mark:mark(),moved:false};
   if(ev.shiftKey&&ev.pointerType==='mouse'){const t=base.t0,h=Yt.time();let w;
     if(hasLoop())w=t<S.a?'a':t>S.b?'b':t-S.a<S.b-t?'a':'b';else{selectTo(h,t);w=t<h?'a':'b'}
