@@ -160,8 +160,11 @@ function draw(){
       ctx.fillStyle=mu;ctx.globalAlpha=.4;ctx.fillRect(x,top,1,H-top);ctx.globalAlpha=1;
       if(lab){ctx.fillStyle=mu;ctx.fillText('1',x+3,H-4)}}}
   if(S.peaks&&S.peaks.length>1){const Pk=S.peaks,N=Pk.length,dur=S.pdur||S.dur||1,cw=tok(cs,'--wave'),ci=tok(cs,'--wave-in');
-    for(let x=0;x<W;x+=2){const t0=v0+x/W*span,t1=v0+(x+2)/W*span;let i0=Math.floor(t0/dur*N),i1=Math.max(i0+1,Math.floor(t1/dur*N));let m=0;for(let i=Math.max(0,i0);i<Math.min(N,i1);i++)if(Pk[i]>m)m=Pk[i];
-      const h=Math.max(1,m*amp),t=(t0+t1)/2;ctx.fillStyle=(loop&&t>=S.a&&t<=S.b)?ci:cw;ctx.fillRect(x,mid-h,1.5,2*h)}}
+    // Columns sit on a fixed grid in song time (a power-of-two number of peaks wide, about 2 px), so panning
+    // slides the waveform instead of re-bucketing it, and zooming only regroups at each doubling.
+    const pd=dur/N,cd=pd*Math.pow(2,Math.max(0,Math.round(Math.log2(2*span/W/pd)))),cw2=Math.max(1,cd*pps*0.75);
+    for(let k=Math.floor(v0/cd);k*cd<=v1;k++){const t0=k*cd,i0=Math.round(t0/pd),i1=Math.round((t0+cd)/pd);let m=0;for(let i=Math.max(0,i0);i<Math.min(N,i1);i++)if(Pk[i]>m)m=Pk[i];
+      const h=Math.max(1,m*amp),t=t0+cd/2;ctx.fillStyle=(loop&&t>=S.a&&t<=S.b)?ci:cw;ctx.fillRect(X(t0),mid-h,cw2,2*h)}}
   else{ctx.fillStyle=tok(cs,'--line');ctx.fillRect(0,mid,W,1)}
   if(loop){ctx.fillStyle=tok(cs,'--tape');ctx.fillRect(Math.round(xa)-1,0,2,H);ctx.fillRect(Math.round(xb)-1,0,2,H);
     ctx.fillStyle=tok(cs,'--tape-fill');ctx.fillRect(xa-1,0,20,18);ctx.fillRect(xb-19,0,20,18);
