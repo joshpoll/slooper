@@ -47,7 +47,6 @@ function setSteps(list){
   setRate(S.rate);
 }
 function setRate(r){r=Math.max(50,Math.min(150,r));S.rate=steps?steps.reduce((x,y)=>Math.abs(y-r)<Math.abs(x-r)?y:x):Math.round(r/5)*5;applyRate();render();save()}
-function stepRate(d){if(!steps)return setRate(S.rate+5*d);const i=steps.indexOf(S.rate);setRate(steps[Math.max(0,Math.min(steps.length-1,i+d))])}
 function probeYtRates(){
   // keep 5% steps; checkYtRate falls back to these listed speeds if the player refuses one
   ytRates=(yt.getAvailablePlaybackRates()||[]).map(x=>Math.round(x*100)).filter(x=>x>=50&&x<=150);
@@ -186,10 +185,10 @@ function render(){
     $('loopSum').textContent='Loop length '+len.toFixed(1)+' s'+beats+(S.lead?' · lead-in starts at '+fmt(pre()):'')}
   else $('loopSum').textContent='No loop. Set A or B to the playhead to make one.';
   for(const id of ['aMinus','aPlus','bMinus','bPlus','tLead','tRepeat','fitLoop'])$(id).disabled=!loop;
-  if(document.activeElement!==$('speedVal'))$('speedVal').value=S.rate+'%';$('speed').value=S.rate;
+  if(document.activeElement!==$('speedVal'))$('speedVal').value=S.rate+'%';$('speed').value=S.rate;$('speedBtn').textContent=S.rate+'%';
+  for(const b of $('speedPop').querySelectorAll('[data-rate]'))b.setAttribute('aria-pressed',+b.dataset.rate===S.rate);
   for(const [id,k] of [['tLead','lead'],['tSnap','snap'],['tRepeat','repeat'],['tClick','click'],['tBig','big']])$(id).setAttribute('aria-pressed',S[k]);
   $('counter').classList.toggle('big',S.big);
-  $('bpm').textContent=S.bpm?('≈ '+Math.round(S.bpm)+' BPM'):'';
   const step=useSnap()?'beat':'second';for(const id of ['aMinus','aPlus','bMinus','bPlus'])$(id).title='Move one '+step;
   dirty=true;
 }
@@ -301,7 +300,6 @@ canvas.addEventListener('wheel',ev=>{
 /* ---------- controls ---------- */
 function restart(){if(S.click)audioCtx();startLoop();lockScreen()}
 $('play').onclick=togglePlay;$('restart').onclick=restart;
-$('slower').onclick=()=>stepRate(-1);$('faster').onclick=()=>stepRate(1);
 $('speed').oninput=e=>setRate(+e.target.value);
 $('aMinus').onclick=()=>setA(nudge(S.a,-1));$('aPlus').onclick=()=>setA(nudge(S.a,1));
 $('bMinus').onclick=()=>setB(nudge(S.b,-1));$('bPlus').onclick=()=>setB(nudge(S.b,1));
@@ -317,6 +315,14 @@ $('undo').onclick=undo;
   sv.addEventListener('focus',()=>{cancel=false;sv.value=S.rate;sv.select()});
   sv.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();sv.blur()}else if(e.key==='Escape'){cancel=true;sv.blur()}});
   sv.addEventListener('blur',()=>{const n=parseFloat(sv.value);if(!cancel&&isFinite(n))setRate(n);else render()})}
+// Speed popover, like the Apple Podcasts speed menu: preset chips, plus a slider and the typed percentage for any other speed.
+// Presets go through setRate, so when YouTube only allows coarse steps they snap to the nearest allowed speed.
+{const btn=$('speedBtn'),pop=$('speedPop');
+  const show=open=>{pop.hidden=!open;btn.setAttribute('aria-expanded',open)};
+  btn.onclick=()=>show(pop.hidden);
+  for(const b of pop.querySelectorAll('[data-rate]'))b.onclick=()=>setRate(+b.dataset.rate);
+  document.addEventListener('pointerdown',e=>{if(!pop.hidden&&!pop.contains(e.target)&&!btn.contains(e.target))show(false)});
+  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!pop.hidden){show(false);btn.focus()}})}
 $('zOut').onclick=()=>zoom(-1);$('zIn').onclick=()=>zoom(1);$('fitLoop').onclick=fitLoop;$('fitSong').onclick=fitSong;
 $('recenter').onclick=()=>setFollow(FOLLOW);
 // Space plays and pauses. A second Space within 300 ms, with a loop, restarts from the loop start instead.
