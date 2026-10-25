@@ -1,7 +1,8 @@
 (function(){
 const $=s=>document.getElementById(s);
 const canvas=$('wave'), ctx=canvas.getContext('2d');
-const LEAD=3; // real seconds of lead-in
+const LEAD=3; // real seconds of lead-in when there is no beat grid
+const LEAD_BEATS=8; // otherwise the lead-in is one eight-count
 // a,b: the loop, or both null when there is no loop (then playback runs straight through).
 // zw: timeline view width in seconds (0 = not set yet), v0: view start.
 // beats, bpm: the beat grid, from analysis/<id>.json (empty = no grid).
@@ -16,7 +17,9 @@ function save(){const v={a:S.a,b:S.b,rate:S.rate,lead:S.lead,snap:S.snap,repeat:
 
 const fmt=t=>{if(!isFinite(t))t=0;t=Math.max(0,t);const m=Math.floor(t/60),s=t-m*60;return m+':'+(s<10?'0':'')+s.toFixed(1)};
 const hasLoop=()=>S.a!==null;
-const pre=()=>hasLoop()?Math.max(0,S.a-(S.lead?LEAD*S.rate/100:0)):0; // where a round starts: the lead-in before A, or the song's start with no loop
+// where a round starts: one eight-count before A (3 real seconds without beats), A with the lead-in off, or the song's start with no loop
+const pre=()=>{if(!hasLoop())return 0;if(!S.lead)return S.a;if(!S.beats.length)return Math.max(0,S.a-LEAD*S.rate/100);
+  const i=nearestBeatIdx(S.a)-LEAD_BEATS;return Math.max(0,i>=0?S.beats[i]:S.a-LEAD_BEATS*beatLen())};
 
 /* ---------- YouTube player ---------- */
 let yt=null, ytState=-1, ytReady=false, apiPromise=null, ytRates=[];
