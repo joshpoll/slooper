@@ -55,6 +55,7 @@
           <button id="fitLoop" title="Show the whole loop">Fit loop</button>
           <button id="fitSong" title="Show the whole song">Fit song</button>
         </div>
+        <div class="seg undo"><button id="undo" disabled title="Undo the last loop change">Undo</button></div>
         <div class="seg lead" id="leadSeg" role="group" aria-label="Lead-in beats before A"><span>Lead-in</span><button data-n="0">0</button><button data-n="8">8</button><button data-n="16">16</button></div>
         <div class="speed">
           <button id="speedBtn" class="speed-btn" aria-haspopup="dialog" aria-expanded="false" aria-controls="speedPop" title="Playback speed">100%</button>
@@ -79,23 +80,6 @@
       <div id="status" class="status"></div>
     </div>
 
-    <div class="panel">
-      <div class="points">
-        <div class="pt">
-          <span class="label">Start (A)<span id="aCount"></span></span>
-          <span id="aTime" class="time">0:20.0</span>
-          <div class="nudge"><button id="aMinus" aria-label="Move start earlier">‹</button><button id="aPlus" aria-label="Move start later">›</button></div>
-          <button id="aHere">Set to playhead</button>
-        </div>
-        <div class="pt">
-          <span class="label">End (B)</span>
-          <span id="bTime" class="time">0:44.0</span>
-          <div class="nudge"><button id="bMinus" aria-label="Move end earlier">‹</button><button id="bPlus" aria-label="Move end later">›</button></div>
-          <button id="bHere">Set to playhead</button>
-        </div>
-      </div>
-      <div class="loop-foot"><button id="undo" disabled>Undo</button></div>
-    </div>
 
   </section>
 </main>
@@ -106,6 +90,7 @@
     <dt><kbd>Space</kbd></dt><dd>Play or pause</dd>
     <dt><kbd>Space</kbd> <kbd>Space</kbd></dt><dd>Restart loop</dd>
     <dt><kbd>[</kbd> <kbd>]</kbd></dt><dd>A / B to playhead</dd>
+    <dt><kbd>⌘Z</kbd></dt><dd>Undo</dd>
     <dt>Click</dt><dd>Seek</dd>
     <dt>Drag</dt><dd>Make a loop</dd>
     <dt><kbd>Shift</kbd> click</dt><dd>Extend loop</dd>

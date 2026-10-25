@@ -7,18 +7,20 @@ It is built for one dancer practicing on an iPhone in Safari. It is a plain stat
 ## How to use it
 
 1. When the page opens, it loads the song you used last, or the first song in the list. To switch, tap the song name at the top right and pick another song.
-2. Drag the red A and B markers on the timeline to choose the section to loop. The ‹ and › buttons move a marker by one beat, and **Set to playhead** puts it where the video is now. **Undo** puts the markers back where they were before your last change. Press it again to step further back.
+2. Drag the red A and B markers on the timeline to choose the section to loop. **Undo**, in the row of buttons above the timeline, puts the markers back where they were before your last change. Press it again to step further back.
 3. Set the speed and press **Play**. Each round starts with a lead-in before A. Choose 0, 8 or 16 beats with the **Lead-in** buttons next to the speed. On a song without beats, each 8 beats of lead-in is 3 seconds. The loop always repeats, and A and B always snap to the beats.
 
 The speed button is at the top right of the timeline and shows the current speed, such as 90%. Tap it to open the speed menu. It has buttons for 70%, 90%, 100% and 110%, and the current one is red. For any other speed, drag the slider under **Custom**, or tap the percentage next to it and type a number. Speeds go from 50% to 150% in steps of 5%. Tap outside the menu, or press Escape, to close it. Some YouTube videos only allow speeds in steps of 25%. Then a note under the timeline buttons says which speeds are allowed, and the presets and slider snap to the nearest one.
 
-On the timeline, tap to jump there, and drag anywhere away from the markers to scroll it. To make a new loop, hold a finger still on the timeline for a moment until the A marker appears, then drag to where the loop should end. You can also tap **Set to playhead** under A or B. That makes a loop about 8 beats long, starting or ending at the playhead. Double-tap to clear the loop. With no loop, Play just plays the song from the playhead. **Undo** brings back a loop you cleared or replaced.
+On the timeline, tap to jump there, and drag anywhere away from the markers to scroll it. To make a new loop, hold a finger still on the timeline for a moment until the A marker appears, then drag to where the loop should end. Double-tap to clear the loop. With no loop, Play just plays the song from the playhead. **Undo** brings back a loop you cleared or replaced.
 
 On a computer, the space bar plays and pauses. Press it twice quickly to start again from the beginning of the loop (from the lead-in). Click the timeline to jump there, and click and drag to make a new loop, like selecting text. Shift-click to move the nearer end of the loop to where you click, and keep dragging to move it further. With no loop, shift-click makes one from the playhead to the click. Scroll sideways with the trackpad to scroll the timeline. Scroll up and down, or pinch, to zoom in and out around the pointer.
 
+On a computer, the [ key moves A to the playhead and the ] key moves B to the playhead. If there is no loop, either key makes a loop about 8 beats long that starts or ends at the playhead. Cmd+Z on a Mac, or Ctrl+Z elsewhere, does the same as **Undo**.
+
 The − and + buttons zoom out and in, **Fit loop** shows the whole loop, and **Fit song** shows the whole song. The zoom stays where you put it. Thin lines mark each "1". While the song plays, the timeline follows the playhead, like a map app following you: the playhead stays at the same spot on the screen and the timeline moves under it. That spot is wherever the playhead was when following started, so after you tap the timeline, the playhead stays where you tapped. When you scroll the timeline yourself, or tap Fit loop or Fit song, it stops following and shows a **Re-center** button. Tap Re-center to put the playhead a quarter of the way in from the left and follow it from there. Play, Restart and tapping the timeline also start following again.
 
-The count strip lights up the current count. The "1" belongs to the song, so it stays on the same beat wherever you put A. The beats and which beat is the "1" come from the song's analysis file. The label next to A shows which count A is on.
+The count strip lights up the current count. The "1" belongs to the song, so it stays on the same beat wherever you put A. The beats and which beat is the "1" come from the song's analysis file.
 
 
 Slooper remembers the loop points and speed for each video on your phone.

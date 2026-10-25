@@ -62,7 +62,6 @@ const useSnap=()=>S.beats.length>0;
 const oneIdx=()=>S.one;
 const countOf=(i,one)=>(((i-one)%8)+8)%8; // 0 means "1"
 function snap(t){if(useSnap())return S.beats[nearestBeatIdx(t)];return Math.round(t*10)/10}
-function nudge(t,dir){if(useSnap()){let i=nearestBeatIdx(t);if(Math.abs(S.beats[i]-t)>0.02){i=dir>0?(S.beats[i]>t?i:i+1):(S.beats[i]<t?i:i-1)}else i+=dir;i=Math.max(0,Math.min(S.beats.length-1,i));return S.beats[i]}return Math.round((t+dir)*10)/10}
 // Undo: a stack of earlier {a,b}. Callers grab mark() before a change and pass it to record() after, so one gesture is one entry.
 let undos=[];
 const mark=()=>({a:S.a,b:S.b});
@@ -74,7 +73,7 @@ const loopLen=()=>8*beatLen();
 function setA(t){const m=mark();if(!hasLoop())S.b=Math.min(S.dur||t,snap(t+loopLen()));S.a=Math.max(0,Math.min(t,S.b-0.5));record(m);render();save()}
 function setB(t){const m=mark();if(!hasLoop())S.a=Math.max(0,snap(t-loopLen()));S.b=Math.min(S.dur||t,Math.max(t,S.a+0.5));record(m);render();save()}
 function clearLoop(){if(!hasLoop())return;const m=mark();S.a=S.b=null;record(m);render();save();
-  $('status').textContent='Loop cleared. Play runs straight through. Set A or B to the playhead to make a new loop, or tap Undo to get this one back.'}
+  $('status').textContent='Loop cleared. Play runs straight through. Hold then drag on the timeline to make a new loop, or tap Undo to get this one back.'}
 function snapAB(){if(!useSnap()||!hasLoop())return;const m=mark();S.a=snap(S.a);S.b=Math.max(snap(S.b),S.a+0.5);record(m)}
 // New waveform and beats, from a fetched analysis file.
 function gotAnalysis(peaks,pdur,beats,bpm,one,saved){
@@ -168,13 +167,10 @@ function draw(){
 /* ---------- UI ---------- */
 function render(){
   const loop=hasLoop();
-  $('aTime').textContent=loop?fmt(S.a):'–';$('bTime').textContent=loop?fmt(S.b):'–';
-  $('aCount').textContent=loop&&S.beats.length?' · count '+(countOf(nearestBeatIdx(S.a),oneIdx())+1):'';
-  for(const id of ['aMinus','aPlus','bMinus','bPlus','fitLoop'])$(id).disabled=!loop;
+  $('fitLoop').disabled=!loop;
   if(document.activeElement!==$('speedVal'))$('speedVal').value=S.rate+'%';$('speed').value=S.rate;$('speedBtn').textContent=S.rate+'%';
   for(const b of $('speedPop').querySelectorAll('[data-rate]'))b.setAttribute('aria-pressed',+b.dataset.rate===S.rate);
   for(const b of document.querySelectorAll('#leadSeg button')){b.setAttribute('aria-pressed',+b.dataset.n===S.leadBeats);b.disabled=!loop}
-  const step=useSnap()?'beat':'second';for(const id of ['aMinus','aPlus','bMinus','bPlus'])$(id).title='Move one '+step;
   dirty=true;
 }
 
@@ -290,9 +286,6 @@ canvas.addEventListener('wheel',ev=>{
 function restart(){startLoop();lockScreen()}
 $('play').onclick=togglePlay;$('restart').onclick=restart;
 $('speed').oninput=e=>setRate(+e.target.value);
-$('aMinus').onclick=()=>setA(nudge(S.a,-1));$('aPlus').onclick=()=>setA(nudge(S.a,1));
-$('bMinus').onclick=()=>setB(nudge(S.b,-1));$('bPlus').onclick=()=>setB(nudge(S.b,1));
-$('aHere').onclick=()=>setA(snap(Yt.time()));$('bHere').onclick=()=>setB(snap(Yt.time()));
 for(const b of document.querySelectorAll('#leadSeg button'))b.onclick=()=>{S.leadBeats=+b.dataset.n;render();save()};
 $('undo').onclick=undo;
 // Typed speed: the percentage is an input. Commit on Enter or blur (setRate clamps and rounds); Escape or junk reverts.
@@ -315,6 +308,11 @@ let lastSpace=0;
 document.addEventListener('keydown',e=>{if(e.code!=='Space'||!S.dur||/INPUT|BUTTON|TEXTAREA|SELECT/.test(e.target.tagName))return;
   e.preventDefault();if(e.repeat)return;const now=performance.now();
   if(hasLoop()&&now-lastSpace<300){lastSpace=0;restart()}else{lastSpace=now;togglePlay()}});
+// [ and ] set A and B to the playhead (with no loop, they make an 8-beat loop). Cmd/Ctrl+Z undoes. Not while typing in a field.
+document.addEventListener('keydown',e=>{if(!S.dur||/INPUT|TEXTAREA|SELECT/.test(e.target.tagName))return;
+  if((e.metaKey||e.ctrlKey)&&!e.shiftKey&&!e.altKey&&e.key.toLowerCase()==='z'){e.preventDefault();undo();return}
+  if(e.metaKey||e.ctrlKey||e.altKey)return;
+  if(e.key==='['){e.preventDefault();setA(snap(Yt.time()))}else if(e.key===']'){e.preventDefault();setB(snap(Yt.time()))}});
 new ResizeObserver(resize).observe($('cwrap'));
 try{matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>dirty=true)}catch(e){}
 new MutationObserver(()=>dirty=true).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
