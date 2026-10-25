@@ -55,8 +55,25 @@
           <button id="fitLoop" title="Show the whole loop">Fit loop</button>
           <button id="fitSong" title="Show the whole song">Fit song</button>
         </div>
-        <span id="bpm" class="meta"></span>
+        <div class="speed">
+          <button id="speedBtn" class="speed-btn" aria-haspopup="dialog" aria-expanded="false" aria-controls="speedPop" title="Playback speed">100%</button>
+          <div id="speedPop" class="speed-pop" role="dialog" aria-label="Speed" hidden>
+            <span class="label">Speed</span>
+            <div class="presets" role="group" aria-label="Preset speeds">
+              <button data-rate="70" aria-pressed="false">70%</button>
+              <button data-rate="90" aria-pressed="false">90%</button>
+              <button data-rate="100" aria-pressed="true">100%</button>
+              <button data-rate="110" aria-pressed="false">110%</button>
+            </div>
+            <div class="custom">
+              <span class="label">Custom</span>
+              <input id="speed" type="range" min="50" max="150" step="5" value="100" aria-label="Custom speed">
+              <input id="speedVal" class="speed-val" type="text" inputmode="numeric" autocomplete="off" value="100%" aria-label="Speed in percent. Tap to type.">
+            </div>
+          </div>
+        </div>
       </div>
+      <div id="rateNote" class="note rate-note"></div>
       <div class="canvas-wrap" id="cwrap"><canvas id="wave" aria-label="Timeline. Tap to seek, drag to scroll, hold then drag to make a loop, drag A or B to move the loop, double-tap to clear the loop."></canvas><button id="recenter" class="recenter" hidden>Re-center</button></div>
       <div id="status" class="status">Tap the timeline to jump there. Drag it to scroll, or hold and then drag to make a loop. Drag A or B to move the loop. Double-tap to clear the loop.</div>
     </div>
@@ -77,18 +94,6 @@
         </div>
       </div>
       <div class="loop-foot"><div id="loopSum" class="loop-sum"></div><button id="undo" disabled>Undo</button></div>
-    </div>
-
-    <div class="panel">
-      <span class="label">Speed</span>
-      <div class="speed-row">
-        <button id="slower" aria-label="Slower by 5 percent">−</button>
-        <input id="speedVal" class="speed-val" type="text" inputmode="numeric" autocomplete="off" value="100%" aria-label="Speed in percent. Tap to type.">
-        <button id="faster" aria-label="Faster by 5 percent">+</button>
-      </div>
-      <input id="speed" type="range" min="50" max="150" step="5" value="100" aria-label="Playback speed">
-      <div class="ticks"><span>50</span><span>75</span><span>100</span><span>125</span><span>150</span></div>
-      <div id="rateNote" class="note"></div>
     </div>
 
     <div class="panel">

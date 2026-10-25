@@ -8,7 +8,9 @@ It is built for one dancer practicing on an iPhone in Safari. It is a plain stat
 
 1. When the page opens, it loads the song you used last, or the first song in the list. To switch, tap the song name at the top right and pick another song.
 2. Drag the red A and B markers on the timeline to choose the section to loop. The ‹ and › buttons move a marker by one beat, and **Set to playhead** puts it where the video is now. **Undo** puts the markers back where they were before your last change. Press it again to step further back.
-3. Set the speed and press **Play**. To type a speed, tap the percentage. With the lead-in on, each loop starts 3 seconds before A.
+3. Set the speed and press **Play**. With the lead-in on, each loop starts 3 seconds before A.
+
+The speed button is at the top right of the timeline and shows the current speed, such as 90%. Tap it to open the speed menu. It has buttons for 70%, 90%, 100% and 110%, and the current one is red. For any other speed, drag the slider under **Custom**, or tap the percentage next to it and type a number. Speeds go from 50% to 150% in steps of 5%. Tap outside the menu, or press Escape, to close it. Some YouTube videos only allow speeds in steps of 25%. Then a note under the timeline buttons says which speeds are allowed, and the presets and slider snap to the nearest one.
 
 On the timeline, tap to jump there, and drag anywhere away from the markers to scroll it. To make a new loop, hold a finger still on the timeline for a moment until the A marker appears, then drag to where the loop should end. You can also tap **Set to playhead** under A or B. That makes a loop about 8 beats long, starting or ending at the playhead. Double-tap to clear the loop. With no loop, Play just plays the song from the playhead. **Undo** brings back a loop you cleared or replaced.
 
