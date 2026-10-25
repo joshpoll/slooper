@@ -7,7 +7,7 @@ const LEAD=3; // real seconds of lead-in
 // beats, bpm: the beat grid, from analysis/<id>.json for YouTube or the in-browser detection for clips (empty = no grid).
 // one: index in beats of a beat that is a "1". It belongs to the song (from the analysis file; 0 for clips), not to A.
 const S={a:20,b:44,rate:100,lead:true,snap:true,repeat:true,click:false,big:false,zw:0,v0:0,dur:0,peaks:null,pdur:0,beats:[],bpm:0,one:0,key:null};
-let objUrl=null, dirty=true, freeSeek=false, drag=null, wake=null, want=false;
+let objUrl=null, dirty=true, drag=null, wake=null, want=false;
 
 const store={get(k){try{return JSON.parse(localStorage.getItem(k))}catch(e){return null}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
 const PREFS=['rate','lead','snap','repeat','click','big'];
@@ -218,12 +218,12 @@ function render(){
 }
 
 async function lockScreen(){try{if('wakeLock'in navigator&&!wake){wake=await navigator.wakeLock.request('screen');wake.addEventListener('release',()=>wake=null)}}catch(e){}}
-function startLoop(){freeSeek=false;followHere();want=true;clickArm=true;P.seek(pre());applyRate();P.play()}
+function startLoop(){followHere();want=true;clickArm=true;P.seek(pre());applyRate();P.play()}
 function togglePlay(){
   if(S.click)audioCtx(); // unlock Web Audio inside the tap
   if(!P.paused()){want=false;P.pause();return}
   const t=P.time();want=true;clickArm=true;followHere();
-  if(hasLoop()&&!freeSeek&&(t<pre()-0.25||t>=S.b-0.05))startLoop();else{applyRate();P.play()}
+  if(hasLoop()&&(t<pre()-0.25||t>=S.b-0.05))startLoop();else{applyRate();P.play()}
   lockScreen();
   if(P===Yt)setTimeout(()=>{if(P===Yt&&want&&P.paused())$('status').textContent="If the video doesn't start, tap the video itself once. After that, Play works from here."},2500);
 }
@@ -257,7 +257,7 @@ function tick(){
   requestAnimationFrame(tick);
   if(!S.dur)return;
   const t=P.time(),playing=!P.paused();
-  if(playing&&hasLoop()&&t>=S.b&&(!freeSeek||t<S.b+0.3)){freeSeek=false;clickArm=true;if(S.repeat)P.seek(pre());else{want=false;P.pause();P.seek(pre())}}
+  if(playing&&hasLoop()&&t>=S.b){clickArm=true;if(S.repeat)P.seek(pre());else{want=false;P.pause();P.seek(pre())}}
   else if(clickArm&&playing&&P.settled()){if(S.click&&S.lead&&hasLoop()&&t<S.a&&t>=pre()-0.3)scheduleClicks(t);clickArm=false}
   ytWatch(performance.now());
   updateCounter(t);
@@ -272,7 +272,7 @@ function tick(){
 function tAt(ev){const r=canvas.getBoundingClientRect(),[v0,v1]=range();return v0+Math.max(0,Math.min(1,(ev.clientX-r.left)/r.width))*(v1-v0)}
 // The A or B tab under the pointer, or null.
 function markerAt(ev){if(!hasLoop())return null;const r=canvas.getBoundingClientRect(),[v0,v1]=range(),X=t=>(t-v0)/(v1-v0)*r.width,x=ev.clientX-r.left;
-  const da=Math.abs(x-X(S.a)-8),db=Math.abs(x-X(S.b)+8);return Math.min(da,db)<26?(da<=db?'a':'b'):null}
+  const da=Math.abs(x-X(S.a)-8),db=Math.abs(x-X(S.b)+8);return Math.min(da,db)<(ev.pointerType==='mouse'?12:22)?(da<=db?'a':'b'):null} // fingers need a bigger target than a mouse
 // Loop selection: the loop spans the press time t0 and t, in either direction, snapped, at least 0.5 s long.
 function selectTo(t0,t){const D=S.dur;let a=snap(Math.min(t0,t)),b=snap(Math.max(t0,t));
   if(b-a<0.5){if(t<t0)a=b-0.5;else b=a+0.5}
@@ -283,7 +283,7 @@ function selectTo(t0,t){const D=S.dur;let a=snap(Math.min(t0,t)),b=snap(Math.max
 let lastTap=null; // {at, x} of the previous tap
 function tapAt(ev){const r=canvas.getBoundingClientRect(),now=performance.now(),dbl=lastTap&&now-lastTap.at<300&&Math.abs(ev.clientX-lastTap.x)<30;
   lastTap=dbl?null:{at:now,x:ev.clientX};
-  freeSeek=true;setFollow(Math.max(0,Math.min(1,(ev.clientX-r.left)/r.width)));P.seek(tAt(ev));
+  setFollow(Math.max(0,Math.min(1,(ev.clientX-r.left)/r.width)));P.seek(tAt(ev));
   if(dbl)clearLoop()}
 // A press on the A or B tab drags that marker (one undo entry per drag). Any other press is a tap, unless it moves:
 // - Mouse or pen: dragging 4 px selects a new loop, like selecting text. Desktop pans with the wheel or trackpad instead.
