@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Slooper</title>
+<meta name="description" content="Loop a section of a dance video, slow it down, and count in eights.">
+<meta name="theme-color" content="#000000">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="Slooper">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/svg+xml" href="icons/icon.svg">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Barlow+Condensed:wght@500;600;700&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header><div class="wrap top-in">
+  <span class="brand"><svg viewBox="0 0 34 20" aria-hidden="true"><path d="M2 17c3 0 5-1 8-1h14c4 0 7-2 7-6 0-3-2-5-5-5-2 0-3 1-4 2-2 2-4 3-7 4-5 1-9 3-13 6z" fill="var(--tape-fill)"/><path d="M26 5l1-4M29 6l3-3" stroke="var(--tape-fill)" stroke-width="1.6" stroke-linecap="round"/><circle cx="27" cy="1" r="1.2" fill="var(--fg)"/><circle cx="32.2" cy="2.8" r="1.2" fill="var(--fg)"/></svg>Sl<i>oo</i>per</span>
+  <label class="btn solid" for="file">Load clip</label>
+  <input id="file" class="sr" type="file" accept="video/*,audio/*">
+</div></header>
+
+<main class="wrap">
+  <section class="panel">
+    <form id="ytForm" class="source">
+      <input id="ytUrl" type="url" inputmode="url" autocomplete="off" placeholder="Paste a YouTube link" value="https://youtu.be/Mwi9E-ztPuU" aria-label="YouTube link">
+      <button type="submit" class="solid btn">Open</button>
+    </form>
+    <div id="srcNote" class="note"></div>
+  </section>
+
+  <section id="empty" class="panel empty">
+    <h1>Slow it down, loop it, count yourself in.</h1>
+    <ol>
+      <li>Open a YouTube link above, or tap <b>Load clip</b> for a video or audio file (a screen recording works).</li>
+      <li>Drag the red A and B markers, set a speed, and press Play.</li>
+      <li>Clips get a waveform and automatic beats. YouTube videos get them too if the song has been analyzed; otherwise tap <b>Tap beat</b> along with the music to lay down the eight-count.</li>
+    </ol>
+    <p>Loop points, speed and beat grid are remembered for each video.</p>
+  </section>
+
+  <section id="app" hidden>
+    <div class="stage" id="stage">
+      <video id="vid" playsinline preload="auto"></video>
+      <div id="ytWrap" class="yt" hidden><div id="ytHost"></div></div>
+      <div id="audioOnly" class="audio-only" hidden>Audio only</div>
+      <div id="count" class="count" hidden>3</div>
+    </div>
+
+    <div id="counter" class="counter" hidden aria-label="Eight-count, starting at A"></div>
+
+    <div class="panel">
+      <div class="wave-head">
+        <div class="seg" role="group" aria-label="Timeline view">
+          <button id="viewSong" aria-pressed="true">Whole</button>
+          <button id="viewLoop" aria-pressed="false">Zoom to loop</button>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <span id="bpm" class="meta"></span>
+          <button id="tap" class="tapbtn" aria-pressed="false">Tap beat</button>
+          <button id="tapClear" hidden>Clear</button>
+        </div>
+      </div>
+      <div class="canvas-wrap" id="cwrap"><canvas id="wave" aria-label="Timeline. Tap to seek, drag A or B to move the loop."></canvas></div>
+      <div id="gridTools" class="gridtools" hidden>
+        <div class="seg" role="group" aria-label="Tempo">
+          <button id="half" title="Halve the tempo">½× tempo</button>
+          <button id="double" title="Double the tempo">2× tempo</button>
+        </div>
+        <div class="shift">
+          <span class="label">Move the 1</span>
+          <button id="oneMinus" aria-label="Move the 1 one beat earlier">‹</button>
+          <button id="onePlus" aria-label="Move the 1 one beat later">›</button>
+        </div>
+      </div>
+      <div id="status" class="status">Tap the timeline to jump there. Drag A or B to move the loop.</div>
+    </div>
+
+    <div class="panel">
+      <div class="points">
+        <div class="pt">
+          <span class="label">Start (A) · <span id="aCount">count 1</span></span>
+          <span id="aTime" class="time">0:20.0</span>
+          <div class="nudge"><button id="aMinus" aria-label="Move start earlier">‹</button><button id="aPlus" aria-label="Move start later">›</button></div>
+          <button id="aHere">Set to playhead</button>
+        </div>
+        <div class="pt">
+          <span class="label">End (B)</span>
+          <span id="bTime" class="time">0:44.0</span>
+          <div class="nudge"><button id="bMinus" aria-label="Move end earlier">‹</button><button id="bPlus" aria-label="Move end later">›</button></div>
+          <button id="bHere">Set to playhead</button>
+        </div>
+      </div>
+      <div id="loopSum" class="loop-sum"></div>
+    </div>
+
+    <div class="panel">
+      <span class="label">Speed</span>
+      <div class="speed-row">
+        <button id="slower" aria-label="Slower by 5 percent">−</button>
+        <span id="speedVal" class="speed-val">100%</span>
+        <button id="faster" aria-label="Faster by 5 percent">+</button>
+      </div>
+      <input id="speed" type="range" min="50" max="150" step="5" value="100" aria-label="Playback speed">
+      <div class="ticks"><span>50</span><span>75</span><span>100</span><span>125</span><span>150</span></div>
+      <div id="rateNote" class="note"></div>
+    </div>
+
+    <div class="panel">
+      <div class="toggles">
+        <button id="tLead" class="tog" aria-pressed="true">3 s lead-in</button>
+        <button id="tSnap" class="tog" aria-pressed="true">Snap to beats</button>
+        <button id="tRepeat" class="tog" aria-pressed="true">Repeat</button>
+        <button id="tClick" class="tog" aria-pressed="false">Lead-in click</button>
+        <button id="tBig" class="tog" aria-pressed="false">Big count</button>
+      </div>
+    </div>
+  </section>
+</main>
+
+<nav class="transport" id="transport" hidden><div class="wrap tr-in">
+  <button id="restart">Restart</button>
+  <button id="play" class="play">Play</button>
+  <span id="now" class="now">0:00.0</span>
+</div></nav>
+
+<script src="app.js"></script>
+</body>
+</html>
