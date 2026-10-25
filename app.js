@@ -2,14 +2,15 @@
 const $=s=>document.getElementById(s);
 const video=$('vid'), canvas=$('wave'), ctx=canvas.getContext('2d');
 const LEAD=3; // real seconds of lead-in
-// grid: tapped beat grid {a,p}. auto: detected beats {beats,bpm} (clip analysis or analysis/<id>.json). oct: tempo halved/doubled this many times. shift: beats from A to the "1".
-const S={a:20,b:44,rate:100,lead:true,snap:true,repeat:true,click:false,big:false,view:'song',dur:0,peaks:null,pdur:0,beats:[],bpm:0,grid:null,auto:null,oct:0,shift:0,key:null};
-let objUrl=null, dirty=true, freeSeek=false, drag=null, wake=null, want=false;
+// grid: tapped beat grid {a,p}. auto: detected beats {beats,bpm} (clip analysis or analysis/<id>.json). oct: tempo halved/doubled this many times.
+// shift: index (mod 8) in S.beats of a beat that counts as "1"; it belongs to the song, not to A. phase: when halved (oct<0), which base beats are kept (index mod 2^-oct).
+const S={a:20,b:44,rate:100,lead:true,snap:true,repeat:true,click:false,big:false,view:'song',dur:0,peaks:null,pdur:0,beats:[],bpm:0,grid:null,auto:null,oct:0,shift:0,phase:0,key:null};
+let objUrl=null, dirty=true, freeSeek=false, drag=null, dragMark=null, wake=null, want=false;
 
 const store={get(k){try{return JSON.parse(localStorage.getItem(k))}catch(e){return null}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
 const PREFS=['rate','lead','snap','repeat','click','big'];
 const prefs=store.get('cl:prefs'); if(prefs){for(const k of PREFS) if(k in prefs) S[k]=prefs[k];}
-function save(){const v={a:S.a,b:S.b,rate:S.rate,lead:S.lead,snap:S.snap,repeat:S.repeat,view:S.view,grid:S.grid,oct:S.oct,shift:S.shift};if(S.key)store.set(S.key,v);const p={};for(const k of PREFS)p[k]=S[k];store.set('cl:prefs',p);}
+function save(){const v={a:S.a,b:S.b,rate:S.rate,lead:S.lead,snap:S.snap,repeat:S.repeat,view:S.view,grid:S.grid,oct:S.oct,shift:S.shift,phase:S.phase};if(S.key)store.set(S.key,v);const p={};for(const k of PREFS)p[k]=S[k];store.set('cl:prefs',p);}
 
 const fmt=t=>{if(!isFinite(t))t=0;t=Math.max(0,t);const m=Math.floor(t/60),s=t-m*60;return m+':'+(s<10?'0':'')+s.toFixed(1)};
 const pre=()=>Math.max(0,S.a-(S.lead?LEAD*S.rate/100:0));
@@ -61,22 +62,28 @@ function probeYtRates(){
 function nearestIdx(b,t){let lo=0,hi=b.length-1;if(hi<0)return -1;while(hi-lo>1){const m=(lo+hi)>>1;if(b[m]<t)lo=m;else hi=m}return Math.abs(b[lo]-t)<=Math.abs(b[hi]-t)?lo:hi}
 const nearestBeatIdx=t=>nearestIdx(S.beats,t);
 const useSnap=()=>S.snap&&S.beats.length>0;
-const oneIdx=()=>nearestBeatIdx(S.a)+S.shift; // index of a beat that counts as "1"
+const oneIdx=()=>S.shift; // index of a beat that counts as "1" (fixed for the song, independent of A)
 const countOf=(i,one)=>(((i-one)%8)+8)%8; // 0 means "1"
 function snap(t){if(useSnap())return S.beats[nearestBeatIdx(t)];return Math.round(t*10)/10}
 function nudge(t,dir){if(useSnap()){let i=nearestBeatIdx(t);if(Math.abs(S.beats[i]-t)>0.02){i=dir>0?(S.beats[i]>t?i:i+1):(S.beats[i]<t?i:i-1)}else i+=dir;i=Math.max(0,Math.min(S.beats.length-1,i));return S.beats[i]}return Math.round((t+dir)*10)/10}
-function setA(t){S.a=Math.max(0,Math.min(t,S.b-0.5));render();save()}
-function setB(t){S.b=Math.min(S.dur||t,Math.max(t,S.a+0.5));render();save()}
+// Undo: a stack of earlier {a,b}. Callers grab mark() before a change and pass it to record() after, so one gesture is one entry.
+let undos=[];
+const mark=()=>({a:S.a,b:S.b});
+function record(m){if(m.a===S.a&&m.b===S.b)return;undos.push(m);if(undos.length>50)undos.shift();$('undo').disabled=false}
+function clearUndo(){undos=[];$('undo').disabled=true}
+function undo(){const m=undos.pop();if(m){S.a=m.a;S.b=m.b;render();save()}$('undo').disabled=!undos.length}
+function setA(t){const m=mark();S.a=Math.max(0,Math.min(t,S.b-0.5));record(m);render();save()}
+function setB(t){const m=mark();S.b=Math.min(S.dur||t,Math.max(t,S.a+0.5));record(m);render();save()}
+function snapAB(){if(!useSnap())return;const m=mark();S.a=snap(S.a);S.b=Math.max(snap(S.b),S.a+0.5);record(m)}
 function gridBeats(g,dur){const out=[];if(!g||!(g.p>0.2))return out;let k=Math.ceil((0-g.a)/g.p);for(let t=g.a+k*g.p;t<=dur;t+=g.p)out.push(t);return out}
 function doubleBeats(B){const o=[];for(let i=0;i<B.length;i++){o.push(B[i]);if(i+1<B.length)o.push((B[i]+B[i+1])/2)}return o}
-function halveBeats(B){const j=nearestIdx(B,S.a)&1;return B.filter((_,i)=>(i&1)===j)} // keep the beat at A
 // A tapped grid wins over detected beats; half/double applies to whichever is in use.
 function useBeats(){
   let B=[],bpm=0;
   if(S.grid){B=gridBeats(S.grid,S.dur);bpm=60/S.grid.p}
   else if(S.auto){B=S.auto.beats;bpm=S.auto.bpm}
   for(let k=0;k<S.oct;k++)B=doubleBeats(B);
-  for(let k=0;k>S.oct&&B.length;k--)B=halveBeats(B);
+  if(S.oct<0){const m=1<<-S.oct;B=B.filter((_,i)=>i%m===S.phase%m)} // halved: keep every m-th beat, starting at phase
   S.beats=B;S.bpm=B.length?bpm*Math.pow(2,S.oct):0;
   $('tapClear').hidden=!S.grid;$('tapClear').textContent=S.auto?'Use detected':'Clear';
   $('gridTools').hidden=!B.length;
@@ -84,12 +91,18 @@ function useBeats(){
 // New waveform and detected beats, from clip analysis or a fetched analysis file.
 function gotAnalysis(peaks,pdur,beats,bpm,saved){
   S.peaks=peaks;S.pdur=pdur;S.auto=beats.length?{beats,bpm}:null;useBeats();
-  if(!saved&&useSnap()){S.a=snap(S.a);S.b=Math.max(snap(S.b),S.a+0.5)}
+  if(!saved)snapAB();
   render();
 }
+// Keep the downbeat when the tempo changes: find the "1" in base-beat units (the list before halving/doubling),
+// then re-express it in the new list. Doubling: base beat i is new beat 2i. Halving: pick the phase that keeps the "1".
+// If the "1" sat on a beat the new list drops (a doubled-in midpoint), the beat just before it becomes the "1".
 function setOct(d){
-  const o=Math.max(-2,Math.min(2,S.oct+d));if(o===S.oct)return;S.oct=o;useBeats();
-  if(useSnap()){S.a=snap(S.a);S.b=Math.max(snap(S.b),S.a+0.5)}
+  const o=Math.max(-2,Math.min(2,S.oct+d));if(o===S.oct)return;
+  const bi=S.oct>=0?S.shift/(1<<S.oct):S.phase+S.shift*(1<<-S.oct); // base index of the "1" (fractional = midpoint)
+  if(o>=0){S.shift=Math.floor(bi*(1<<o))%8;S.phase=0}
+  else{const m=1<<-o,f=Math.floor(bi);S.phase=f%m;S.shift=((f-S.phase)/m)%8}
+  S.oct=o;useBeats();snapAB();
   render();save();$('status').textContent=(d>0?'Tempo doubled':'Tempo halved')+(S.bpm?' to about '+Math.round(S.bpm)+' BPM.':'.');
 }
 function shiftOne(d){S.shift=(S.shift+d+8)%8;render();save()}
@@ -135,10 +148,10 @@ $('tap').onclick=()=>{
   if(now-lastTapWall>2500){taps=[];freshTaps=true}lastTapWall=now;taps.push(t);if(taps.length>16)taps.shift();
   $('tap').setAttribute('aria-pressed','true');setTimeout(()=>$('tap').setAttribute('aria-pressed','false'),120);
   const g=fitTaps();
-  if(g){S.grid=g;if(freshTaps){S.oct=0;S.shift=0;freshTaps=false}useBeats();render();save();$('status').textContent='Beat grid set from '+taps.length+' taps. Keep tapping to refine, or put A on a 1.'}
+  if(g){S.grid=g;if(freshTaps){S.oct=0;S.shift=0;S.phase=0;freshTaps=false}useBeats();render();save();$('status').textContent='Beat grid set from '+taps.length+' taps. Keep tapping to refine. Use Move the 1 if the 1 is on the wrong beat.'}
   else $('status').textContent='Keep tapping… ('+taps.length+')';
 };
-$('tapClear').onclick=()=>{S.grid=null;S.oct=0;S.shift=0;taps=[];useBeats();render();save();$('status').textContent=S.auto?'Back to the detected beats.':'Beat grid cleared.'};
+$('tapClear').onclick=()=>{S.grid=null;S.oct=0;S.shift=0;S.phase=0;taps=[];useBeats();render();save();$('status').textContent=S.auto?'Back to the detected beats.':'Beat grid cleared.'};
 
 /* ---------- lead-in click ---------- */
 let ac=null,clicks=[],clickArm=false;
@@ -189,10 +202,10 @@ function draw(){
 /* ---------- UI ---------- */
 function render(){
   $('aTime').textContent=fmt(S.a);$('bTime').textContent=fmt(S.b);
-  $('aCount').textContent='count '+(S.beats.length?(8-S.shift)%8+1:1);
+  $('aCount').textContent=S.beats.length?' · count '+(countOf(nearestBeatIdx(S.a),oneIdx())+1):'';
   const len=S.b-S.a;let beats='';if(S.beats.length){const n=S.beats.filter(b=>b>=S.a-0.03&&b<S.b-0.03).length;beats=' · '+n+' beats'}
   $('loopSum').textContent='Loop length '+len.toFixed(1)+' s'+beats+(S.lead?' · lead-in starts at '+fmt(pre()):'');
-  $('speedVal').textContent=S.rate+'%';$('speed').value=S.rate;
+  if(document.activeElement!==$('speedVal'))$('speedVal').value=S.rate+'%';$('speed').value=S.rate;
   for(const [id,k] of [['tLead','lead'],['tSnap','snap'],['tRepeat','repeat'],['tClick','click'],['tBig','big']])$(id).setAttribute('aria-pressed',S[k]);
   $('counter').classList.toggle('big',S.big);
   $('viewSong').setAttribute('aria-pressed',S.view==='song');$('viewLoop').setAttribute('aria-pressed',S.view==='loop');
@@ -253,13 +266,13 @@ function tAt(ev){const r=canvas.getBoundingClientRect(),[v0,v1]=range();return v
 canvas.addEventListener('pointerdown',ev=>{
   if(!S.dur)return;const r=canvas.getBoundingClientRect(),[v0,v1]=range(),X=t=>(t-v0)/(v1-v0)*r.width,x=ev.clientX-r.left;
   const da=Math.abs(x-X(S.a)-8),db=Math.abs(x-X(S.b)+8);
-  if(Math.min(da,db)<26){drag=da<=db?'a':'b'}else{drag='head';freeSeek=true;P.seek(tAt(ev))}
+  if(Math.min(da,db)<26){drag=da<=db?'a':'b';dragMark=mark()}else{drag='head';freeSeek=true;P.seek(tAt(ev))}
   canvas.setPointerCapture(ev.pointerId);ev.preventDefault();dirty=true;
 });
 canvas.addEventListener('pointermove',ev=>{if(!drag)return;const t=tAt(ev);
   if(drag==='a'){S.a=Math.max(0,Math.min(snap(t),S.b-0.5))}else if(drag==='b'){S.b=Math.min(S.dur,Math.max(snap(t),S.a+0.5))}else{P.seek(t)}
   render()});
-const endDrag=()=>{if(drag&&drag!=='head')save();drag=null};
+const endDrag=()=>{if(drag&&drag!=='head'){record(dragMark);save()}drag=null};
 canvas.addEventListener('pointerup',endDrag);canvas.addEventListener('pointercancel',endDrag);
 
 /* ---------- controls ---------- */
@@ -275,7 +288,13 @@ $('tLead').onclick=()=>{S.lead=!S.lead;render();save()};
 $('tRepeat').onclick=()=>{S.repeat=!S.repeat;render();save()};
 $('tClick').onclick=()=>{S.click=!S.click;if(S.click)audioCtx();render();save()};
 $('tBig').onclick=()=>{S.big=!S.big;render();save()};
-$('tSnap').onclick=()=>{S.snap=!S.snap;if(useSnap()){S.a=snap(S.a);S.b=Math.max(snap(S.b),S.a+0.5)}render();save()};
+$('tSnap').onclick=()=>{S.snap=!S.snap;snapAB();render();save()};
+$('undo').onclick=undo;
+// Typed speed: the percentage is an input. Commit on Enter or blur (setRate clamps and rounds); Escape or junk reverts.
+{const sv=$('speedVal');let cancel=false;
+  sv.addEventListener('focus',()=>{cancel=false;sv.value=S.rate;sv.select()});
+  sv.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();sv.blur()}else if(e.key==='Escape'){cancel=true;sv.blur()}});
+  sv.addEventListener('blur',()=>{const n=parseFloat(sv.value);if(!cancel&&isFinite(n))setRate(n);else render()})}
 $('viewSong').onclick=()=>{S.view='song';render();save()};$('viewLoop').onclick=()=>{S.view='loop';render();save()};
 document.addEventListener('keydown',e=>{if(e.code==='Space'&&S.dur&&!/INPUT|BUTTON|TEXTAREA/.test(e.target.tagName)){e.preventDefault();togglePlay()}});
 new ResizeObserver(resize).observe($('cwrap'));
@@ -285,8 +304,8 @@ new MutationObserver(()=>dirty=true).observe(document.documentElement,{attribute
 /* ---------- shared setup after a source loads ---------- */
 function showApp(){$('empty').hidden=true;$('app').hidden=false;$('transport').hidden=false}
 function restore(key){
-  S.key=key;const saved=store.get(key);S.grid=null;S.oct=0;S.shift=0;
-  if(saved){for(const k of ['a','b','rate','lead','snap','repeat','view','grid','oct','shift'])if(k in saved)S[k]=saved[k]}
+  S.key=key;const saved=store.get(key);S.grid=null;S.oct=0;S.shift=0;S.phase=0;clearUndo();
+  if(saved){for(const k of ['a','b','rate','lead','snap','repeat','view','grid','oct','shift','phase'])if(k in saved)S[k]=saved[k]}
   else{if(S.dur>=46){S.a=20;S.b=44}else{S.a=0;S.b=Math.min(S.dur||8,8)}}
   S.b=Math.min(S.b,S.dur||S.b);S.a=Math.max(0,Math.min(S.a,S.b-0.5));
   return !!saved;
@@ -357,7 +376,7 @@ $('ytForm').addEventListener('submit',async e=>{
   const me=yt=new YT.Player('ytHost',{videoId:id,playerVars:{playsinline:1,rel:0,modestbranding:1,controls:1},
     events:{
       onReady:()=>{ytReady=true;S.dur=yt.getDuration()||0;const saved=restore('cl:yt:'+id);useBeats();probeYtRates();resize();render();P.seek(pre());
-        note.textContent='';$('status').textContent='Press Play. For counts, tap Tap beat along with the music for 8 or so beats, then put A on a 1.';
+        note.textContent='';$('status').textContent='Press Play. For counts, tap Tap beat along with the music for 8 or so beats, then use Move the 1 to put the 1 on the downbeat.';
         ana.then(j=>{if(yt!==me||!j)return;
           if(!S.dur&&j.duration>0)S.dur=j.duration;
           gotAnalysis(Float32Array.from(j.peaks),+j.duration||S.dur,j.beats.filter(Number.isFinite),+j.bpm||0,saved);

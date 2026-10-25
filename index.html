@@ -53,7 +53,7 @@
       <div id="count" class="count" hidden>3</div>
     </div>
 
-    <div id="counter" class="counter" hidden aria-label="Eight-count, starting at A"></div>
+    <div id="counter" class="counter" hidden aria-label="Eight-count"></div>
 
     <div class="panel">
       <div class="wave-head">
@@ -75,8 +75,8 @@
         </div>
         <div class="shift">
           <span class="label">Move the 1</span>
-          <button id="oneMinus" aria-label="Move the 1 one beat earlier">‹</button>
-          <button id="onePlus" aria-label="Move the 1 one beat later">›</button>
+          <button id="oneMinus" aria-label="Move the 1 one beat earlier, for the whole song">‹</button>
+          <button id="onePlus" aria-label="Move the 1 one beat later, for the whole song">›</button>
         </div>
       </div>
       <div id="status" class="status">Tap the timeline to jump there. Drag A or B to move the loop.</div>
@@ -85,7 +85,7 @@
     <div class="panel">
       <div class="points">
         <div class="pt">
-          <span class="label">Start (A) · <span id="aCount">count 1</span></span>
+          <span class="label">Start (A)<span id="aCount"></span></span>
           <span id="aTime" class="time">0:20.0</span>
           <div class="nudge"><button id="aMinus" aria-label="Move start earlier">‹</button><button id="aPlus" aria-label="Move start later">›</button></div>
           <button id="aHere">Set to playhead</button>
@@ -97,14 +97,14 @@
           <button id="bHere">Set to playhead</button>
         </div>
       </div>
-      <div id="loopSum" class="loop-sum"></div>
+      <div class="loop-foot"><div id="loopSum" class="loop-sum"></div><button id="undo" disabled>Undo</button></div>
     </div>
 
     <div class="panel">
       <span class="label">Speed</span>
       <div class="speed-row">
         <button id="slower" aria-label="Slower by 5 percent">−</button>
-        <span id="speedVal" class="speed-val">100%</span>
+        <input id="speedVal" class="speed-val" type="text" inputmode="numeric" autocomplete="off" value="100%" aria-label="Speed in percent. Tap to type.">
         <button id="faster" aria-label="Faster by 5 percent">+</button>
       </div>
       <input id="speed" type="range" min="50" max="150" step="5" value="100" aria-label="Playback speed">
