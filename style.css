@@ -16,10 +16,11 @@ header{padding-top:env(safe-area-inset-top,0px)}
 .top-in{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-block:14px}
 .brand{font-family:var(--display);font-weight:700;font-size:22px;letter-spacing:.02em;text-transform:uppercase}
 .brand{display:inline-flex;align-items:center;gap:8px}.brand svg{width:34px;height:20px;flex:none}.brand i{font-style:normal;color:var(--tape);background:var(--tape-soft);padding:0 4px;margin:0 5px;position:relative}
-/* the loop's A/B bars, drawn as the slug's eye stalks */
-.brand i::before,.brand i::after{content:"";position:absolute;bottom:0;top:-9px;width:6px;transform-origin:50% 100%;
-  background:radial-gradient(circle at 3px 3px,var(--fg) 2.2px,transparent 2.6px),linear-gradient(var(--tape),var(--tape)) 50% 5px/2px 100% no-repeat}
-.brand i::before{left:-3px;transform:rotate(-10deg)}.brand i::after{right:-3px;transform:rotate(10deg)}
+/* the loop's A/B markers, drawn as the slug's eyes on their stalks */
+.brand i::before,.brand i::after{position:absolute;bottom:0;top:-14px;width:13px;
+  font:700 9px/13px var(--body);color:var(--tape-ink);text-align:center;
+  background:radial-gradient(circle at 6.5px 6.5px,var(--tape) 6px,transparent 6.5px),linear-gradient(var(--tape),var(--tape)) 50% 10px/2px 100% no-repeat}
+.brand i::before{content:"A";left:-6.5px}.brand i::after{content:"B";right:-6.5px}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 
 button,.btn{font:inherit;color:var(--fg);background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 14px;cursor:pointer;-webkit-tap-highlight-color:transparent;display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:44px}
