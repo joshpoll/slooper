@@ -112,3 +112,15 @@ input[type=range]{width:100%;min-width:0;accent-color:var(--tape);height:32px;ma
 #srcNote:empty{display:none}
 .empty code{font-size:13px;color:var(--fg)}
 .status:empty{display:none}
+
+/* desktop cheat-sheet in the right gutter, only when it fits beside the 720px column */
+.cheat{display:none}
+@media (min-width:1180px) and (hover:hover) and (pointer:fine){
+  .cheat{display:block;position:fixed;top:76px;left:calc(50% + 376px);width:min(230px,calc(50vw - 384px));box-sizing:border-box;
+    background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px 14px;font-size:13px;line-height:1.35;color:var(--muted)}
+  .cheat h2{margin:0 0 8px}
+  .cheat dl{display:grid;grid-template-columns:auto 1fr;gap:6px 10px;margin:0;align-items:baseline}
+  .cheat dt{color:var(--fg);white-space:nowrap}.cheat dd{margin:0}
+  .cheat p{margin:10px 0 0;padding-top:10px;border-top:1px solid var(--line)}.cheat b{color:var(--fg);font-weight:400}
+  kbd{font:700 11px/1 var(--body);color:var(--fg);background:var(--bg);border:1px solid var(--line);border-bottom-width:2px;border-radius:5px;padding:2px 5px}
+}
