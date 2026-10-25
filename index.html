@@ -58,9 +58,11 @@
 
     <div class="panel">
       <div class="wave-head">
-        <div class="seg" role="group" aria-label="Timeline view">
-          <button id="viewSong" aria-pressed="true">Whole</button>
-          <button id="viewLoop" aria-pressed="false">Zoom to loop</button>
+        <div class="seg zoom" role="group" aria-label="Timeline zoom">
+          <button id="zOut" class="zstep" aria-label="Zoom out">−</button>
+          <button id="zIn" class="zstep" aria-label="Zoom in">+</button>
+          <button id="fitLoop" title="Show the whole loop">Fit loop</button>
+          <button id="fitSong" title="Show the whole song">Fit song</button>
         </div>
         <div style="display:flex;gap:8px;align-items:center">
           <span id="bpm" class="meta"></span>
@@ -68,7 +70,7 @@
           <button id="tapClear" hidden>Clear</button>
         </div>
       </div>
-      <div class="canvas-wrap" id="cwrap"><canvas id="wave" aria-label="Timeline. Tap to seek, drag A or B to move the loop."></canvas></div>
+      <div class="canvas-wrap" id="cwrap"><canvas id="wave" aria-label="Timeline. Tap to seek, drag to scroll, drag A or B to move the loop."></canvas></div>
       <div id="gridTools" class="gridtools" hidden>
         <div class="seg" role="group" aria-label="Tempo">
           <button id="half" title="Halve the tempo">½× tempo</button>
@@ -80,7 +82,7 @@
           <button id="onePlus" aria-label="Move the 1 one beat later, for the whole song">›</button>
         </div>
       </div>
-      <div id="status" class="status">Tap the timeline to jump there. Drag A or B to move the loop.</div>
+      <div id="status" class="status">Tap the timeline to jump there. Drag it to scroll. Drag A or B to move the loop.</div>
     </div>
 
     <div class="panel">

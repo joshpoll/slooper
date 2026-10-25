@@ -2,15 +2,16 @@
 const $=s=>document.getElementById(s);
 const video=$('vid'), canvas=$('wave'), ctx=canvas.getContext('2d');
 const LEAD=3; // real seconds of lead-in
+// zw: timeline view width in seconds (0 = not set yet), v0: view start.
 // grid: tapped beat grid {a,p}. auto: detected beats {beats,bpm} (clip analysis or analysis/<id>.json). oct: tempo halved/doubled this many times.
 // shift: index (mod 8) in S.beats of a beat that counts as "1"; it belongs to the song, not to A. phase: when halved (oct<0), which base beats are kept (index mod 2^-oct).
-const S={a:20,b:44,rate:100,lead:true,snap:true,repeat:true,click:false,big:false,view:'song',dur:0,peaks:null,pdur:0,beats:[],bpm:0,grid:null,auto:null,oct:0,shift:0,phase:0,key:null};
+const S={a:20,b:44,rate:100,lead:true,snap:true,repeat:true,click:false,big:false,zw:0,v0:0,dur:0,peaks:null,pdur:0,beats:[],bpm:0,grid:null,auto:null,oct:0,shift:0,phase:0,key:null};
 let objUrl=null, dirty=true, freeSeek=false, drag=null, dragMark=null, wake=null, want=false;
 
 const store={get(k){try{return JSON.parse(localStorage.getItem(k))}catch(e){return null}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
 const PREFS=['rate','lead','snap','repeat','click','big'];
 const prefs=store.get('cl:prefs'); if(prefs){for(const k of PREFS) if(k in prefs) S[k]=prefs[k];}
-function save(){const v={a:S.a,b:S.b,rate:S.rate,lead:S.lead,snap:S.snap,repeat:S.repeat,view:S.view,grid:S.grid,oct:S.oct,shift:S.shift,phase:S.phase};if(S.key)store.set(S.key,v);const p={};for(const k of PREFS)p[k]=S[k];store.set('cl:prefs',p);}
+function save(){const v={a:S.a,b:S.b,rate:S.rate,lead:S.lead,snap:S.snap,repeat:S.repeat,zw:S.zw,grid:S.grid,oct:S.oct,shift:S.shift,phase:S.phase};if(S.key)store.set(S.key,v);const p={};for(const k of PREFS)p[k]=S[k];store.set('cl:prefs',p);}
 
 const fmt=t=>{if(!isFinite(t))t=0;t=Math.max(0,t);const m=Math.floor(t/60),s=t-m*60;return m+':'+(s<10?'0':'')+s.toFixed(1)};
 const pre=()=>Math.max(0,S.a-(S.lead?LEAD*S.rate/100:0));
@@ -92,6 +93,7 @@ function useBeats(){
 function gotAnalysis(peaks,pdur,beats,bpm,saved){
   S.peaks=peaks;S.pdur=pdur;S.auto=beats.length?{beats,bpm}:null;useBeats();
   if(!saved)snapAB();
+  if(zwAuto){S.zw=defW();homeView()} // default zoom: about 10 eight-counts, now that the beat is known
   render();
 }
 // Keep the downbeat when the tempo changes: find the "1" in base-beat units (the list before halving/doubling),
@@ -168,7 +170,26 @@ function scheduleClicks(t){
 }
 
 /* ---------- drawing ---------- */
-function range(){if(S.view==='loop'){const pad=Math.max(2,(S.b-S.a)*0.15);return[Math.max(0,S.a-pad-LEAD),Math.min(S.dur,S.b+pad)]}return[0,S.dur||1]}
+// The timeline works like a PDF page: a fixed scale you pan. Only the zoom buttons change the scale.
+const EIGHTS=[2,4,6,10,16,24,40]; // zoom levels, in eight-counts across
+const TICKS=[1,2,5,10,15,30,60,120,300,600]; // time label spacing, seconds
+const beatLen=()=>S.bpm?60/S.bpm:0.5; // without a beat grid, act as if 120 BPM, so 10 eights = 40 s
+const defW=()=>80*beatLen();
+let zwAuto=true, seeHead=true, lastT=0; // zwAuto: the width is the default and may be redone once beats arrive. seeHead: page the view to keep the playhead in sight.
+function vw(){const D=S.dur||1;return Math.min(D,Math.max(1,S.zw||defW()))}
+function range(){const W=vw();S.v0=Math.max(0,Math.min((S.dur||1)-W,S.v0||0));return[S.v0,S.v0+W]}
+function homeView(){S.v0=pre()-0.05*vw();range();dirty=true}
+function setView(v0,w){S.zw=w;S.v0=v0;zwAuto=false;range();dirty=true;save()}
+function zoom(d){ // d>0 zooms in
+  const W=vw(),L=EIGHTS.map(n=>n*8*beatLen()).filter(w=>w<(S.dur||1));
+  let w=d>0?L.slice().reverse().find(w=>w<W*0.98):L.find(w=>w>W*1.02);
+  if(w===undefined)w=d>0?W:(S.dur||1);
+  const [v0,v1]=range(),t=P.time(),f=(t>=v0&&t<=v1)?(t-v0)/W:0.5; // keep the playhead (or the middle) where it is
+  setView(v0+f*W-f*w,w);
+}
+function fitLoop(){const s=S.lead?pre():S.a,m=Math.max(0.5,(S.b-s)*0.08);setView(s-m,S.b-s+2*m)}
+function fitSong(){setView(0,S.dur||1)}
+const mss=k=>Math.floor(k/60)+':'+String(k%60).padStart(2,'0');
 function tok(cs,n){return cs.getPropertyValue(n).trim()}
 function resize(){const r=canvas.getBoundingClientRect(),d=window.devicePixelRatio||1;canvas.width=Math.round(r.width*d);canvas.height=Math.round(r.height*d);dirty=true}
 function draw(){
@@ -180,14 +201,19 @@ function draw(){
   const xa=X(S.a),xb=X(S.b),xp=X(pre());
   if(S.lead){ctx.fillStyle=tok(cs,'--tape-soft');ctx.globalAlpha=.45;ctx.fillRect(xp,top,xa-xp,H-top);ctx.globalAlpha=1}
   ctx.fillStyle=tok(cs,'--tape-soft');ctx.fillRect(xa,top,xb-xa,H-top);
-  if(S.beats.length){const B=S.beats,one=oneIdx(),bp=W/span*(B.length>1?(B[1]-B[0]):1);
-    const lc=tok(cs,'--line'),mu=tok(cs,'--muted'),fg=tok(cs,'--fg');
-    ctx.font='700 11px '+tok(cs,'--body');ctx.textAlign='center';ctx.textBaseline='middle';
-    for(let i=0;i<B.length;i++){const b=B[i];if(b<v0-1||b>v1+1)continue;const x=X(b),c=countOf(i,one)+1;
-      if(bp>=3||c===1){ctx.fillStyle=lc;ctx.fillRect(Math.round(x),top,c===1?2:1,H-top)}
-      if(c===1||bp>=16||(bp>=8&&c===5)){ctx.fillStyle=c===1?fg:mu;ctx.fillText(String(c),x,top-8)}
-      if(bp>=12&&i+1<B.length){const xm=Math.round(X((b+B[i+1])/2));ctx.fillStyle=lc;ctx.fillRect(xm,top,1,6);ctx.fillRect(xm,H-6,1,6)}}
+  const mu=tok(cs,'--muted'),pps=W/span;
+  // time ruler: m:ss labels at the first spacing on the ladder that leaves room for them
+  {const st=TICKS.find(s=>s*pps>=48)||600;ctx.font='600 11px '+tok(cs,'--body');ctx.textAlign='center';ctx.textBaseline='middle';
+    for(let k=Math.ceil(v0/st)*st;k<=v1;k+=st){const x=X(k);ctx.fillStyle=tok(cs,'--line');ctx.fillRect(Math.round(x),top-4,1,4);
+      if(x>12&&x<W-12){ctx.fillStyle=mu;ctx.fillText(mss(k),x,top-11)}}
     ctx.textBaseline='alphabetic'}
+  // beat grid: a line on each "1" only
+  const sp=8*beatLen()*pps; // pixels per eight-count
+  if(S.beats.length&&sp>=6){const B=S.beats,one=oneIdx(),lab=sp>=24;
+    ctx.font='700 10px '+tok(cs,'--body');ctx.textAlign='left';
+    for(let i=Math.max(0,nearestIdx(B,v0)-1);i<B.length&&B[i]<=v1+1;i++){if(countOf(i,one)!==0)continue;const x=Math.round(X(B[i]));
+      ctx.fillStyle=mu;ctx.globalAlpha=.4;ctx.fillRect(x,top,1,H-top);ctx.globalAlpha=1;
+      if(lab){ctx.fillStyle=mu;ctx.fillText('1',x+3,H-4)}}}
   if(S.peaks&&S.peaks.length>1){const Pk=S.peaks,N=Pk.length,dur=S.pdur||S.dur||1,cw=tok(cs,'--wave'),ci=tok(cs,'--wave-in');
     for(let x=0;x<W;x+=2){const t0=v0+x/W*span,t1=v0+(x+2)/W*span;let i0=Math.floor(t0/dur*N),i1=Math.max(i0+1,Math.floor(t1/dur*N));let m=0;for(let i=Math.max(0,i0);i<Math.min(N,i1);i++)if(Pk[i]>m)m=Pk[i];
       const h=Math.max(1,m*amp),t=(t0+t1)/2;ctx.fillStyle=(t>=S.a&&t<=S.b)?ci:cw;ctx.fillRect(x,mid-h,1.5,2*h)}}
@@ -208,18 +234,17 @@ function render(){
   if(document.activeElement!==$('speedVal'))$('speedVal').value=S.rate+'%';$('speed').value=S.rate;
   for(const [id,k] of [['tLead','lead'],['tSnap','snap'],['tRepeat','repeat'],['tClick','click'],['tBig','big']])$(id).setAttribute('aria-pressed',S[k]);
   $('counter').classList.toggle('big',S.big);
-  $('viewSong').setAttribute('aria-pressed',S.view==='song');$('viewLoop').setAttribute('aria-pressed',S.view==='loop');
   $('bpm').textContent=S.bpm?('≈ '+Math.round(S.bpm)+' BPM'):'';
   const step=useSnap()?'beat':'second';for(const id of ['aMinus','aPlus','bMinus','bPlus'])$(id).title='Move one '+step;
   dirty=true;
 }
 
 async function lockScreen(){try{if('wakeLock'in navigator&&!wake){wake=await navigator.wakeLock.request('screen');wake.addEventListener('release',()=>wake=null)}}catch(e){}}
-function startLoop(){freeSeek=false;want=true;clickArm=true;P.seek(pre());applyRate();P.play()}
+function startLoop(){freeSeek=false;seeHead=true;want=true;clickArm=true;P.seek(pre());applyRate();P.play()}
 function togglePlay(){
   if(S.click)audioCtx(); // unlock Web Audio inside the tap
   if(!P.paused()){want=false;P.pause();return}
-  const t=P.time();want=true;clickArm=true;
+  const t=P.time();want=true;clickArm=true;seeHead=true;
   if(!freeSeek&&(t<pre()-0.25||t>=S.b-0.05))startLoop();else{applyRate();P.play()}
   lockScreen();
   if(P===Yt)setTimeout(()=>{if(P===Yt&&want&&P.paused())$('status').textContent="If the video doesn't start, tap the video itself once. After that, Play works from here."},2500);
@@ -255,6 +280,9 @@ function tick(){
   else if(clickArm&&playing&&P.settled()){if(S.click&&S.lead&&t<S.a&&t>=pre()-0.3)scheduleClicks(t);clickArm=false}
   ytWatch(performance.now());
   updateCounter(t);
+  // page the view: jump a page when the playhead runs off the right, or to the playhead when it loops back
+  if(t<lastT-0.5)seeHead=true;lastT=t;
+  if(playing&&seeHead&&!(drag&&drag.x!==undefined)){const [v0,v1]=range();if(t<v0||t>v1){S.v0=t-0.05*vw();range();dirty=true}}
   const c=$('count');
   if(playing&&S.lead&&!S.beats.length&&t<S.a-0.02&&t>=pre()-0.3){const n=Math.ceil((S.a-t)/(S.rate/100));const s=String(Math.max(1,Math.min(LEAD,n)));if(c.textContent!==s)c.textContent=s;c.hidden=false}else if(!c.hidden)c.hidden=true;
   $('now').textContent=fmt(t);
@@ -266,13 +294,21 @@ function tAt(ev){const r=canvas.getBoundingClientRect(),[v0,v1]=range();return v
 canvas.addEventListener('pointerdown',ev=>{
   if(!S.dur)return;const r=canvas.getBoundingClientRect(),[v0,v1]=range(),X=t=>(t-v0)/(v1-v0)*r.width,x=ev.clientX-r.left;
   const da=Math.abs(x-X(S.a)-8),db=Math.abs(x-X(S.b)+8);
-  if(Math.min(da,db)<26){drag=da<=db?'a':'b';dragMark=mark()}else{drag='head';freeSeek=true;P.seek(tAt(ev))}
+  // a marker wins, then the playhead line (scrub); anything else pans on drag or seeks on tap
+  if(Math.min(da,db)<26){drag=da<=db?'a':'b';dragMark=mark()}else if(Math.abs(x-X(P.time()))<12){drag='head';freeSeek=true}else drag={x:ev.clientX,v0,moved:false}
   canvas.setPointerCapture(ev.pointerId);ev.preventDefault();dirty=true;
 });
-canvas.addEventListener('pointermove',ev=>{if(!drag)return;const t=tAt(ev);
+canvas.addEventListener('pointermove',ev=>{if(!drag)return;
+  if(drag.x!==undefined){const dx=ev.clientX-drag.x;if(!drag.moved&&Math.abs(dx)<6)return;drag.moved=true;S.v0=drag.v0-dx/canvas.getBoundingClientRect().width*vw();range();dirty=true;return}
+  const t=tAt(ev);
   if(drag==='a'){S.a=Math.max(0,Math.min(snap(t),S.b-0.5))}else if(drag==='b'){S.b=Math.min(S.dur,Math.max(snap(t),S.a+0.5))}else{P.seek(t)}
   render()});
-const endDrag=()=>{if(drag&&drag!=='head'){record(dragMark);save()}drag=null};
+const endDrag=ev=>{
+  if(drag&&drag.x!==undefined){
+    if(drag.moved){const [v0,v1]=range(),t=P.time();seeHead=t>=v0&&t<=v1} // panned away from the playhead: stop paging until it comes back or loops
+    else if(ev.type==='pointerup'){freeSeek=true;seeHead=true;P.seek(tAt(ev))}}
+  else if(drag&&drag!=='head'){record(dragMark);save()}
+  drag=null;dirty=true};
 canvas.addEventListener('pointerup',endDrag);canvas.addEventListener('pointercancel',endDrag);
 
 /* ---------- controls ---------- */
@@ -295,7 +331,7 @@ $('undo').onclick=undo;
   sv.addEventListener('focus',()=>{cancel=false;sv.value=S.rate;sv.select()});
   sv.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();sv.blur()}else if(e.key==='Escape'){cancel=true;sv.blur()}});
   sv.addEventListener('blur',()=>{const n=parseFloat(sv.value);if(!cancel&&isFinite(n))setRate(n);else render()})}
-$('viewSong').onclick=()=>{S.view='song';render();save()};$('viewLoop').onclick=()=>{S.view='loop';render();save()};
+$('zOut').onclick=()=>zoom(-1);$('zIn').onclick=()=>zoom(1);$('fitLoop').onclick=fitLoop;$('fitSong').onclick=fitSong;
 document.addEventListener('keydown',e=>{if(e.code==='Space'&&S.dur&&!/INPUT|BUTTON|TEXTAREA/.test(e.target.tagName)){e.preventDefault();togglePlay()}});
 new ResizeObserver(resize).observe($('cwrap'));
 try{matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>dirty=true)}catch(e){}
@@ -304,10 +340,11 @@ new MutationObserver(()=>dirty=true).observe(document.documentElement,{attribute
 /* ---------- shared setup after a source loads ---------- */
 function showApp(){$('empty').hidden=true;$('app').hidden=false;$('transport').hidden=false}
 function restore(key){
-  S.key=key;const saved=store.get(key);S.grid=null;S.oct=0;S.shift=0;S.phase=0;clearUndo();
-  if(saved){for(const k of ['a','b','rate','lead','snap','repeat','view','grid','oct','shift','phase'])if(k in saved)S[k]=saved[k]}
+  S.key=key;const saved=store.get(key);S.grid=null;S.oct=0;S.shift=0;S.phase=0;S.zw=0;clearUndo();
+  if(saved){for(const k of ['a','b','rate','lead','snap','repeat','zw','grid','oct','shift','phase'])if(k in saved)S[k]=saved[k]}
   else{if(S.dur>=46){S.a=20;S.b=44}else{S.a=0;S.b=Math.min(S.dur||8,8)}}
   S.b=Math.min(S.b,S.dur||S.b);S.a=Math.max(0,Math.min(S.a,S.b-0.5));
+  zwAuto=!(S.zw>0);homeView();
   return !!saved;
 }
 
