@@ -7,7 +7,7 @@ const LEAD=3; // real seconds of lead-in
 // beats, bpm: the beat grid, from analysis/<id>.json for YouTube or the in-browser detection for clips (empty = no grid).
 // one: index in beats of a beat that is a "1". It belongs to the song (from the analysis file; 0 for clips), not to A.
 const S={a:20,b:44,rate:100,lead:true,snap:true,repeat:true,click:false,big:false,zw:0,v0:0,dur:0,peaks:null,pdur:0,beats:[],bpm:0,one:0,key:null};
-let objUrl=null, dirty=true, drag=null, wake=null, want=false;
+let objUrl=null, dirty=true, drag=null, hoverX=null, wake=null, want=false;
 
 const store={get(k){try{return JSON.parse(localStorage.getItem(k))}catch(e){return null}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
 const PREFS=['rate','lead','snap','repeat','click','big'];
@@ -180,7 +180,7 @@ function draw(){
   // time ruler: m:ss labels at the first spacing on the ladder that leaves room for them
   {const st=TICKS.find(s=>s*pps>=48)||600;ctx.font='600 11px '+tok(cs,'--body');ctx.textAlign='center';ctx.textBaseline='middle';
     for(let k=Math.ceil(v0/st)*st;k<=v1;k+=st){const x=X(k);ctx.fillStyle=tok(cs,'--line');ctx.fillRect(Math.round(x),top-4,1,4);
-      if(x>12&&x<W-12){ctx.fillStyle=mu;ctx.fillText(mss(k),x,top-11)}}
+      if(x>12&&x<W-12&&(hoverX===null||Math.abs(x-hoverX)>36)){ctx.fillStyle=mu;ctx.fillText(mss(k),x,top-11)}}
     ctx.textBaseline='alphabetic'}
   // beat grid: a line on each "1" only
   const sp=8*beatLen()*pps; // pixels per eight-count
@@ -198,6 +198,11 @@ function draw(){
     ctx.fillStyle=tok(cs,'--tape-fill');ctx.fillRect(xa-1,0,20,18);ctx.fillRect(xb-19,0,20,18);
     ctx.fillStyle=tok(cs,'--tape-ink');ctx.font='700 12px '+tok(cs,'--body');ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('A',xa+9,9.5);ctx.fillText('B',xb-9,9.5);ctx.textBaseline='alphabetic'}
   ctx.fillStyle=tok(cs,'--head');ctx.fillRect(Math.round(X(P.time()))-1,top-4,2,H-top+4);
+  // mouse hover: the time a click would seek to, like YouTube's progress bar
+  if(hoverX!==null){const x=Math.round(hoverX),lab=mss(Math.max(0,Math.floor(v0+hoverX/W*span)));ctx.font='700 11px '+tok(cs,'--body');
+    const w=ctx.measureText(lab).width+10,bx=Math.max(0,Math.min(W-w,x-w/2));
+    ctx.fillStyle=tok(cs,'--fg');ctx.globalAlpha=.5;ctx.fillRect(x,top-4,1,H-top+4);ctx.globalAlpha=1;
+    ctx.fillRect(bx,top-19,w,16);ctx.fillStyle=tok(cs,'--bg');ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(lab,bx+w/2,top-11);ctx.textBaseline='alphabetic'}
 }
 
 /* ---------- UI ---------- */
@@ -297,6 +302,7 @@ canvas.addEventListener('pointerdown',ev=>{
   canvas.setPointerCapture(ev.pointerId);ev.preventDefault();dirty=true;
 });
 canvas.addEventListener('pointermove',ev=>{
+  if(ev.pointerType==='mouse'){hoverX=ev.clientX-canvas.getBoundingClientRect().left;dirty=true}
   if(!drag){if(ev.pointerType!=='touch')canvas.style.cursor=markerAt(ev)?'ew-resize':'';return}
   const dx=ev.clientX-drag.x;
   if(drag.what==='pan'){if(!drag.moved&&Math.abs(dx)<6)return;
@@ -310,6 +316,7 @@ const endDrag=ev=>{
   if(drag.what==='a'||drag.what==='b'||(drag.what==='sel'&&drag.moved)){record(drag.mark);save()}
   else if(!drag.moved&&ev.type==='pointerup')tapAt(ev);
   drag=null;dirty=true};
+canvas.addEventListener('pointerleave',()=>{hoverX=null;dirty=true});
 canvas.addEventListener('pointerup',endDrag);canvas.addEventListener('pointercancel',endDrag);
 // Wheel and trackpad, like a map: sideways scroll pans (as a drag does); up/down scroll and pinch (ctrlKey) zoom around the cursor.
 canvas.addEventListener('wheel',ev=>{
