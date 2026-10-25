@@ -112,3 +112,4 @@ input[type=range]{width:100%;min-width:0;accent-color:var(--tape);height:32px;ma
 .note{font-size:13px;color:var(--muted);margin-top:6px;min-height:1.2em}
 #srcNote:empty{display:none}
 .empty code{font-size:13px;color:var(--fg)}
+.status:empty{display:none}

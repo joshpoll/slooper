@@ -361,12 +361,11 @@ async function loadYt(id){
   const me=yt=new YT.Player('ytHost',{videoId:id,playerVars:{playsinline:1,rel:0,modestbranding:1,controls:1},
     events:{
       onReady:()=>{ytReady=true;S.dur=yt.getDuration()||0;const saved=restore('cl:yt:'+id);probeYtRates();resize();render();Yt.seek(pre());
-        note.textContent='';$('status').textContent='Press Play.';
+        note.textContent='';$('status').textContent='';
         ana.then(j=>{if(yt!==me||!j)return;
           if(!S.dur&&j.duration>0)S.dur=j.duration;
           gotAnalysis(Float32Array.from(j.peaks),+j.duration||S.dur,j.beats.filter(Number.isFinite),+j.bpm||0,+j.one||0,saved);
-          if(Yt.paused())Yt.seek(pre());
-          $('status').textContent='Drag A or B; they snap to the beat grid.'});
+          if(Yt.paused())Yt.seek(pre())});
       },
       onStateChange:ev=>{const s=ev.data,now=performance.now();ytState=s;
         if(s===3)bufAt=now;
