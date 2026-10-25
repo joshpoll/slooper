@@ -45,8 +45,7 @@ This was written blind: the prototype was never run against the live YouTube pla
 
 - Confirm the API loads and that the first play from a tap works on iOS, with `playsinline: 1`. Fix any autoplay or gesture issues.
 - Check which speeds `setPlaybackRate` accepts in the embedded player on iOS, using `getAvailablePlaybackRates`.
-  - If only coarse steps are allowed (0.25 increments), make the speed control offer only valid rates in YouTube mode, and say so in one line.
-  - If fine steps work, keep 5% steps.
+  - Fine steps work on iOS (the embed's own menu offers any speed), so keep 5% steps. If the player ever plays at a different speed than asked, say so in one line under the timeline buttons.
 - Verify the A→B loop and lead-in seeks are reliable. `seekTo` while playing on iOS can stall, so test 20 consecutive loops.
 - Handle embed-blocked videos (errors 101/150) with a clear message suggesting clip mode.
 

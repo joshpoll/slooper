@@ -20,7 +20,7 @@ const pre=()=>{if(!hasLoop())return 0;const n=S.leadBeats;if(!n)return S.a;if(!S
   const i=nearestBeatIdx(S.a)-n;return Math.max(0,i>=0?S.beats[i]:S.a-n*beatLen())};
 
 /* ---------- YouTube player ---------- */
-let yt=null, ytState=-1, ytReady=false, apiPromise=null, ytRates=[];
+let yt=null, ytState=-1, ytReady=false, apiPromise=null;
 // YouTube seek guard: getCurrentTime can lag behind a seekTo, so until the time lands near the target (or 2 s pass) we report the target.
 // pend holds a seek asked for before the video has ever played; it runs on the first "playing" state (iOS ignores seeks before that).
 let seekT=null, seekAt=0, pend=null, kickAt=0, bufAt=0;
@@ -33,26 +33,12 @@ const Yt={
   paused:()=>!(ytState===1||ytState===3), settled:()=>ytState===1&&seekT===null&&pend===null,
   setRate(r){if(!ytReady)return;try{yt.setPlaybackRate(r)}catch(e){}setTimeout(checkYtRate,400)}};
 function checkYtRate(){if(!ytReady)return;const want=S.rate,got=Math.round(yt.getPlaybackRate()*100);
-  if(got===want){if(!steps)$('rateNote').textContent='';return}
-  // the player quietly refused a 5% step: fall back to the speeds it lists
-  if(!steps&&ytRates.length&&!ytRates.includes(want)){setSteps(ytRates);return}
+  if(got===want){$('rateNote').textContent='';return}
   $('rateNote').textContent='YouTube is playing at '+got+'% instead of '+want+'%.'}
 function applyRate(){Yt.setRate(S.rate/100)}
 function onPlayState(playing){$('play').textContent=playing?'Pause':'Play';if(!playing){$('count').hidden=true;if(wake){wake.release().catch(()=>{});wake=null}}}
 
-/* ---------- speed steps ---------- */
-let steps=null; // the speeds (percent, 50–150) the player allows when it can't do 5% steps
-function setSteps(list){
-  steps=list&&list.length?list:null;$('speed').step=steps?25:5;
-  $('rateNote').textContent=steps?'YouTube only allows '+steps.join(', ')+'% here.':'';
-  setRate(S.rate);
-}
-function setRate(r){r=Math.max(50,Math.min(150,r));S.rate=steps?steps.reduce((x,y)=>Math.abs(y-r)<Math.abs(x-r)?y:x):Math.round(r/5)*5;applyRate();render();save()}
-function probeYtRates(){
-  // keep 5% steps; checkYtRate falls back to these listed speeds if the player refuses one
-  ytRates=(yt.getAvailablePlaybackRates()||[]).map(x=>Math.round(x*100)).filter(x=>x>=50&&x<=150);
-  setSteps(null);
-}
+function setRate(r){S.rate=Math.round(Math.max(50,Math.min(150,r))/5)*5;applyRate();render();save()}
 
 /* ---------- beats ---------- */
 function nearestIdx(b,t){let lo=0,hi=b.length-1;if(hi<0)return -1;while(hi-lo>1){const m=(lo+hi)>>1;if(b[m]<t)lo=m;else hi=m}return Math.abs(b[lo]-t)<=Math.abs(b[hi]-t)?lo:hi}
@@ -321,7 +307,6 @@ $('undo').onclick=undo;
   sv.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();sv.blur()}else if(e.key==='Escape'){cancel=true;sv.blur()}});
   sv.addEventListener('blur',()=>{const n=parseFloat(sv.value);if(!cancel&&isFinite(n))setRate(n);else render()})}
 // Speed popover, like the Apple Podcasts speed menu: preset chips, plus a slider and the typed percentage for any other speed.
-// Presets go through setRate, so when YouTube only allows coarse steps they snap to the nearest allowed speed.
 {const btn=$('speedBtn'),pop=$('speedPop');
   const show=open=>{pop.hidden=!open;btn.setAttribute('aria-expanded',open)};
   btn.onclick=()=>show(pop.hidden);
@@ -383,7 +368,7 @@ async function loadYt(id){
   if(yt){try{yt.destroy()}catch(e){}const h=document.createElement('div');h.id='ytHost';$('ytWrap').replaceChildren(h)}
   const me=yt=new YT.Player('ytHost',{videoId:id,playerVars:{playsinline:1,rel:0,modestbranding:1,controls:1},
     events:{
-      onReady:()=>{ytReady=true;S.dur=yt.getDuration()||0;const saved=restore('cl:yt:'+id);probeYtRates();resize();render();Yt.seek(pre());
+      onReady:()=>{ytReady=true;S.dur=yt.getDuration()||0;const saved=restore('cl:yt:'+id);resize();render();Yt.seek(pre());
         note.textContent='';$('status').textContent='';
         ana.then(j=>{if(yt!==me||!j)return;
           if(!S.dur&&j.duration>0)S.dur=j.duration;
