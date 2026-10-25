@@ -122,6 +122,12 @@ function followHead(t){if(followAt===null)return;const W=vw(),to=Math.max(0,Math
   if(Math.abs(d)>1e-4){S.v0=Math.abs(d)<0.1*W?to:S.v0+d*0.25;dirty=true}}
 const mss=k=>Math.floor(k/60)+':'+String(k%60).padStart(2,'0');
 function tok(cs,n){return cs.getPropertyValue(n).trim()}
+// The A and B tabs are TAGW px wide, hanging off their bars into the loop. When the loop is narrower on screen than the two
+// tabs, B's tab is drawn pushed right to sit just right of A's, so B never shows left of A. B's bar and the loop's B time stay put.
+const TAGW=20, bTagX=(xa,xb)=>Math.max(xb,xa+2*TAGW-2);
+// A touch loop selection that began with a long press (the press's timer is set only for touch). Until the finger drags,
+// and while the loop is too narrow for B's tab to sit at B without the push, only A is drawn.
+const longPressSel=()=>drag?.what==='sel'&&drag.timer!==undefined;
 function resize(){const r=canvas.getBoundingClientRect(),d=window.devicePixelRatio||1;canvas.width=Math.round(r.width*d);canvas.height=Math.round(r.height*d);dirty=true}
 function draw(){
   dirty=false;const d=window.devicePixelRatio||1,W=canvas.width/d,H=canvas.height/d;if(!W)return;
@@ -152,9 +158,10 @@ function draw(){
     for(let k=Math.floor(v0/cd);k*cd<=v1;k++){const t0=k*cd,i0=Math.round(t0/pd),i1=Math.round((t0+cd)/pd);let m=0;for(let i=Math.max(0,i0);i<Math.min(N,i1);i++)if(Pk[i]>m)m=Pk[i];
       const h=Math.max(1,m*amp),t=t0+cd/2;ctx.fillStyle=(loop&&t>=S.a&&t<=S.b)?ci:cw;const x0=Math.round(X(t0)*d),x1=Math.round(X(t0+cd)*d);ctx.fillRect(x0/d,mid-h,Math.max(1,x1-x0-gap)/d,2*h)}}
   else{ctx.fillStyle=tok(cs,'--line');ctx.fillRect(0,mid,W,1)}
-  if(loop){ctx.fillStyle=tok(cs,'--tape');ctx.fillRect(Math.round(xa)-1,0,2,H);ctx.fillRect(Math.round(xb)-1,0,2,H);
-    ctx.fillStyle=tok(cs,'--tape-fill');ctx.fillRect(xa-1,0,20,18);ctx.fillRect(xb-19,0,20,18);
-    ctx.fillStyle=tok(cs,'--tape-ink');ctx.font='700 12px '+tok(cs,'--body');ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('A',xa+9,9.5);ctx.fillText('B',xb-9,9.5);ctx.textBaseline='alphabetic'}
+  if(loop){const showB=!(longPressSel()&&(!drag.moved||xb<bTagX(xa,xb))),xt=bTagX(xa,xb); // see longPressSel and bTagX
+    ctx.fillStyle=tok(cs,'--tape');ctx.fillRect(Math.round(xa)-1,0,2,H);if(showB)ctx.fillRect(Math.round(xb)-1,0,2,H);
+    ctx.fillStyle=tok(cs,'--tape-fill');ctx.fillRect(xa-1,0,TAGW,18);if(showB)ctx.fillRect(xt-TAGW+1,0,TAGW,18);
+    ctx.fillStyle=tok(cs,'--tape-ink');ctx.font='700 12px '+tok(cs,'--body');ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('A',xa+9,9.5);if(showB)ctx.fillText('B',xt-9,9.5);ctx.textBaseline='alphabetic'}
   ctx.fillStyle=tok(cs,'--head');ctx.fillRect(Math.round(X(Yt.time()))-1,top-4,2,H-top+4);
   // mouse hover: the time a click would seek to, like YouTube's progress bar
   if(hoverX!==null){const x=Math.round(hoverX),lab=mss(Math.max(0,Math.floor(v0+hoverX/W*span)));ctx.font='700 11px '+tok(cs,'--body');
@@ -225,7 +232,7 @@ function tick(){
 function tAt(ev){const r=canvas.getBoundingClientRect(),[v0,v1]=range();return v0+Math.max(0,Math.min(1,(ev.clientX-r.left)/r.width))*(v1-v0)}
 // The A or B tab under the pointer, or null.
 function markerAt(ev){if(!hasLoop())return null;const r=canvas.getBoundingClientRect(),[v0,v1]=range(),X=t=>(t-v0)/(v1-v0)*r.width,x=ev.clientX-r.left;
-  const da=Math.abs(x-X(S.a)-8),db=Math.abs(x-X(S.b)+8);return Math.min(da,db)<(ev.pointerType==='mouse'?12:22)?(da<=db?'a':'b'):null} // fingers need a bigger target than a mouse
+  const da=Math.abs(x-X(S.a)-8),db=Math.abs(x-bTagX(X(S.a),X(S.b))+8);return Math.min(da,db)<(ev.pointerType==='mouse'?12:22)?(da<=db?'a':'b'):null} // fingers need a bigger target than a mouse
 // Loop selection: the loop spans the press time t0 and t, in either direction, snapped, at least 0.5 s long.
 function selectTo(t0,t){const D=S.dur;let a=snap(Math.min(t0,t)),b=snap(Math.max(t0,t));
   if(b-a<0.5){if(t<t0)a=b-0.5;else b=a+0.5}
@@ -240,22 +247,28 @@ function tapAt(ev){const r=canvas.getBoundingClientRect(),now=performance.now(),
   if(dbl)clearLoop()}
 // A press on the A or B tab drags that marker (one undo entry per drag). Any other press is a tap, unless it moves:
 // - Mouse or pen: dragging 4 px selects a new loop, like selecting text. Desktop pans with the wheel or trackpad instead.
-// - Touch: moving 6 px pans (and stops following), since touch has no wheel. Holding still for 400 ms switches to loop selection.
+// - Touch: moving 6 px pans (and stops following), since touch has no wheel. Holding still for 400 ms switches to loop selection, showing only A until the drag makes room for B.
+// - Two fingers pinch, like a map (see below).
 // Shift+click with a mouse extends the loop like a text selection, without seeking: the nearer end (or the end on that side)
 // jumps to the click, and dragging on moves that same end. With no loop, it makes one from the playhead to the click.
 canvas.addEventListener('pointerdown',ev=>{
   document.activeElement?.blur?.(); // pointerdown's preventDefault keeps focus put; drop it so Space plays instead of pressing the last button
-  if(!S.dur)return;const m=markerAt(ev),base={x:ev.clientX,t0:tAt(ev),mark:mark(),moved:false};
+  if(!S.dur)return;
+  if(ev.pointerType==='touch'){touches.set(ev.pointerId,ev.clientX);
+    if(touches.size>=2){canvas.setPointerCapture(ev.pointerId);ev.preventDefault();if(touches.size===2)startPinch(ev);return}} // a third finger is ignored
+  const m=markerAt(ev),base={x:ev.clientX,t0:tAt(ev),mark:mark(),moved:false};
   if(ev.shiftKey&&ev.pointerType==='mouse'){const t=base.t0,h=Yt.time();let w;
     if(hasLoop())w=t<S.a?'a':t>S.b?'b':t-S.a<S.b-t?'a':'b';else{selectTo(h,t);w=t<h?'a':'b'}
     drag={...base,what:w};moveEnd(w,t)}
   else if(m)drag={...base,what:m};
   else if(ev.pointerType==='touch'){drag={...base,what:'pan',v0:S.v0};const d=drag;
-    d.timer=setTimeout(()=>{if(drag===d&&!d.moved){d.what='sel';d.moved=true;selectTo(d.t0,d.t0);if(navigator.vibrate)navigator.vibrate(10)}},400)}
+    d.timer=setTimeout(()=>{if(drag===d&&!d.moved){d.what='sel';selectTo(d.t0,d.t0);if(navigator.vibrate)navigator.vibrate(10)}},400)}
   else drag={...base,what:'sel'};
   canvas.setPointerCapture(ev.pointerId);ev.preventDefault();dirty=true;
 });
 canvas.addEventListener('pointermove',ev=>{
+  if(touches.has(ev.pointerId))touches.set(ev.pointerId,ev.clientX);
+  if(pinch){if(pinch.ids.includes(ev.pointerId))movePinch();return}
   if(ev.pointerType==='mouse'){hoverX=ev.clientX-canvas.getBoundingClientRect().left;dirty=true}
   if(!drag){if(ev.pointerType!=='touch')canvas.style.cursor=markerAt(ev)?'ew-resize':'';return}
   const dx=ev.clientX-drag.x;
@@ -267,11 +280,26 @@ canvas.addEventListener('pointermove',ev=>{
 function moveEnd(w,t){if(w==='a')S.a=Math.max(0,Math.min(snap(t),S.b-0.5));else S.b=Math.min(S.dur,Math.max(snap(t),S.a+0.5));render()}
 const endDrag=ev=>{
   if(!drag)return;clearTimeout(drag.timer);
-  if(drag.what==='a'||drag.what==='b'||(drag.what==='sel'&&drag.moved)){record(drag.mark);save()}
+  if(drag.what==='a'||drag.what==='b'||(drag.what==='sel'&&(drag.moved||longPressSel()))){record(drag.mark);save()}
   else if(!drag.moved&&ev.type==='pointerup')tapAt(ev);
   drag=null;dirty=true};
 canvas.addEventListener('pointerleave',()=>{hoverX=null;dirty=true});
 canvas.addEventListener('pointerup',endDrag);canvas.addEventListener('pointercancel',endDrag);
+// Two-finger pinch, like a map: the time under the fingers' midpoint stays under it, so spreading zooms in and moving both pans.
+// Only the sideways spread counts. A second finger ends what the first was doing (keeping any loop change, never tapping),
+// and when one finger lifts, the other carries on panning.
+const touches=new Map(); // pointerId -> clientX of each finger on the timeline
+let pinch=null; // {ids, w0: view width, tm: time under the midpoint, d0: spread} at the start
+function pinchSpan(){const r=canvas.getBoundingClientRect(),[p,q]=pinch.ids.map(id=>touches.get(id));
+  return{f:((p+q)/2-r.left)/r.width,d:Math.max(40,Math.abs(p-q))}} // a 40 px floor keeps fingers held one above the other from zooming wildly
+function startPinch(ev){if(drag)endDrag(ev);const [v0]=range(),W=vw();pinch={ids:[...touches.keys()],w0:W};const s=pinchSpan();pinch.tm=v0+s.f*W;pinch.d0=s.d}
+function movePinch(){const s=pinchSpan(),w=Math.min(S.dur||1,Math.max(1,pinch.w0*pinch.d0/s.d));
+  if(followAt!==null)setFollow(null);setView(pinch.tm-s.f*w,w)} // the fingers choose what is on screen, so stop following like a pan does
+// Registered after endDrag, so the pan handed to the remaining finger is not ended by the same pointerup.
+const liftTouch=ev=>{if(!touches.delete(ev.pointerId)||!pinch?.ids.includes(ev.pointerId))return;
+  const id=pinch.ids.find(i=>i!==ev.pointerId);pinch=null;
+  if(touches.has(id))drag={what:'pan',x:touches.get(id),v0:S.v0,moved:true,mark:mark()}};
+canvas.addEventListener('pointerup',liftTouch);canvas.addEventListener('pointercancel',liftTouch);
 // Wheel and trackpad, like a map: sideways scroll pans (as a drag does); up/down scroll and pinch (ctrlKey) zoom around the cursor.
 canvas.addEventListener('wheel',ev=>{
   if(!S.dur)return;ev.preventDefault();
