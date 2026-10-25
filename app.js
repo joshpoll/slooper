@@ -14,7 +14,6 @@ const PREFS=['rate','leadBeats'];
 const prefs=store.get('cl:prefs'); if(prefs){for(const k of PREFS) if(k in prefs) S[k]=prefs[k];}
 function save(){const v={a:S.a,b:S.b,rate:S.rate,leadBeats:S.leadBeats,zw:S.zw};if(S.key)store.set(S.key,v);const p={};for(const k of PREFS)p[k]=S[k];store.set('cl:prefs',p);}
 
-const fmt=t=>{if(!isFinite(t))t=0;t=Math.max(0,t);const m=Math.floor(t/60),s=t-m*60;return m+':'+(s<10?'0':'')+s.toFixed(1)};
 const hasLoop=()=>S.a!==null;
 // where a round starts: S.leadBeats beats before A (3 real seconds per eight without beats), A with no lead-in, or the song's start with no loop
 const pre=()=>{if(!hasLoop())return 0;const n=S.leadBeats;if(!n)return S.a;if(!S.beats.length)return Math.max(0,S.a-LEAD*n/8*S.rate/100);
@@ -219,7 +218,6 @@ function tick(){
   followHead(t);
   const c=$('count');
   if(playing&&S.leadBeats&&hasLoop()&&!S.beats.length&&t<S.a-0.02&&t>=pre()-0.3){const n=Math.ceil((S.a-t)/(S.rate/100));const s=String(Math.max(1,n));if(c.textContent!==s)c.textContent=s;c.hidden=false}else if(!c.hidden)c.hidden=true;
-  $('now').textContent=fmt(t);
   if(playing||dirty)draw();
 }
 
@@ -283,7 +281,8 @@ canvas.addEventListener('wheel',ev=>{
 },{passive:false});
 
 /* ---------- controls ---------- */
-function restart(){startLoop();lockScreen()}
+// Restart goes back to the start of the round and keeps playing or stays paused
+function restart(){if(Yt.paused()){followHere();Yt.seek(pre())}else{startLoop();lockScreen()}}
 $('play').onclick=togglePlay;$('restart').onclick=restart;
 $('speed').oninput=e=>setRate(+e.target.value);
 for(const b of document.querySelectorAll('#leadSeg button'))b.onclick=()=>{S.leadBeats=+b.dataset.n;render();save()};
@@ -307,7 +306,7 @@ $('recenter').onclick=()=>setFollow(FOLLOW);
 let lastSpace=0;
 document.addEventListener('keydown',e=>{if(e.code!=='Space'||!S.dur||/INPUT|BUTTON|TEXTAREA|SELECT/.test(e.target.tagName))return;
   e.preventDefault();if(e.repeat)return;const now=performance.now();
-  if(hasLoop()&&now-lastSpace<300){lastSpace=0;restart()}else{lastSpace=now;togglePlay()}});
+  if(hasLoop()&&now-lastSpace<300){lastSpace=0;startLoop();lockScreen()}else{lastSpace=now;togglePlay()}});
 // [ and ] set A and B to the playhead (with no loop, they make an 8-beat loop). Cmd/Ctrl+Z undoes. Not while typing in a field.
 document.addEventListener('keydown',e=>{if(!S.dur||/INPUT|TEXTAREA|SELECT/.test(e.target.tagName))return;
   if((e.metaKey||e.ctrlKey)&&!e.shiftKey&&!e.altKey&&e.key.toLowerCase()==='z'){e.preventDefault();undo();return}
