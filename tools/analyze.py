@@ -4,6 +4,7 @@
 # dependencies = [
 #     "librosa>=0.10",
 #     "numpy",
+#     "scipy",
 # ]
 # ///
 """Precompute Slooper analysis (waveform peaks + beats) for YouTube videos.
@@ -37,6 +38,8 @@ import numpy as np
 SR = 22050
 N_PEAKS = 4000
 HOP = 512
+FIT_BEATS = 8  # beats either side used to fit each beat's time
+ATTACK_WINDOW = 0.1  # s either side of a tracked beat to look for its kick
 START_BPM = 120.0
 SILENCE_DB = 40  # below peak; quieter audio at either end counts as silence
 OUT_DIR = Path(__file__).resolve().parent.parent / "analysis"
@@ -127,6 +130,42 @@ def compute_peaks(y: np.ndarray, n: int = N_PEAKS) -> list[float]:
     return [round(float(v), 3) for v in peaks]
 
 
+def kick_envelope(y: np.ndarray) -> np.ndarray:
+    """Amplitude envelope of the kick-drum band (40-150 Hz), one value per sample.
+
+    Both filters run forwards and backwards (zero phase), so the envelope is
+    not delayed against the audio.
+    """
+    from scipy.signal import butter, hilbert, sosfiltfilt
+
+    band = sosfiltfilt(butter(4, [40, 150], btype="band", fs=SR, output="sos"), y)
+    return sosfiltfilt(butter(2, 60, fs=SR, output="sos"), np.abs(hilbert(band)))
+
+
+def kick_attack(env: np.ndarray, t: float) -> float | None:
+    """Time of the kick attack within ATTACK_WINDOW of t, or None if no clear kick.
+
+    Finds the steepest rise of the envelope, follows it down to where the rise
+    starts and up to its peak, and returns the moment the envelope has climbed
+    10% of the way. That point is where the kick body becomes audible, a few
+    ms before its steepest rise. (The kick's high click, and claps, can start
+    a few ms earlier still; this low-band point is the robust one to find.)
+    """
+    a = max(0, int((t - ATTACK_WINDOW) * SR))
+    e = env[a:int((t + ATTACK_WINDOW) * SR)]
+    if e.size < 3:
+        return None
+    i = j = int(np.argmax(np.diff(e)))
+    while i > 0 and e[i - 1] < e[i]:
+        i -= 1
+    while j < e.size - 1 and e[j + 1] > e[j]:
+        j += 1
+    lo, hi = e[i], e[j]
+    if hi < 2 * lo:  # less than a doubling: no kick here
+        return None
+    return (a + i + int(np.argmax(e[i:j + 1] >= lo + 0.1 * (hi - lo)))) / SR
+
+
 def compute_beats(y: np.ndarray) -> tuple[float, list[float]]:
     import librosa
 
@@ -137,11 +176,34 @@ def compute_beats(y: np.ndarray) -> tuple[float, list[float]]:
     # let loud hats and claps on the "&" pull the tracker half a beat off.
     start, end = librosa.effects.trim(y, top_db=SILENCE_DB)[1]
     onset_env = librosa.onset.onset_strength(y=y[start:end], sr=SR, hop_length=HOP, fmax=150, n_mels=32)
-    tempo, beat_frames = librosa.beat.beat_track(
+    _, beat_frames = librosa.beat.beat_track(
         onset_envelope=onset_env, sr=SR, hop_length=HOP, start_bpm=START_BPM, trim=False
     )
-    times = librosa.frames_to_time(beat_frames, sr=SR, hop_length=HOP) + start / SR
-    bpm = float(np.atleast_1d(tempo)[0])
+    coarse = librosa.frames_to_time(beat_frames, sr=SR, hop_length=HOP) + start / SR
+
+    # The tracker decides which beat is which, but its times sit on a 23 ms
+    # frame grid and trail the kick by tens of ms. Measure the kick attack
+    # near each beat on the raw samples, then place each beat on a straight
+    # line fitted through the attacks of its neighbours. Dance tracks keep a
+    # steady tempo, so the line removes jitter and outvotes misreadings (a
+    # bass note taken for a kick, a beat with no kick) while still following
+    # slow tempo changes. Theil-Sen keeps the fit robust to those misreadings.
+    env = kick_envelope(y)
+    attacks = np.array([np.nan if (a := kick_attack(env, t)) is None else a for t in coarse])
+    if np.isnan(attacks).all():
+        raise AnalyzeError("no kick drum found to place the beats on")
+    times = np.empty_like(coarse)
+    for i in range(coarse.size):
+        lo, hi = max(0, i - FIT_BEATS), min(coarse.size, i + FIT_BEATS + 1)
+        n = np.arange(lo, hi)[~np.isnan(attacks[lo:hi])]
+        if n.size < 4:  # long stretch without kicks: shift the tracked beat
+            times[i] = coarse[i] + np.nanmedian(attacks - coarse)
+            continue
+        a = attacks[n]
+        jj, kk = np.triu_indices(n.size, 1)
+        slope = np.median((a[kk] - a[jj]) / (n[kk] - n[jj]))
+        times[i] = np.median(a - slope * (n - i))
+    bpm = 60 / float(np.median(np.diff(times)))
     return round(bpm, 1), [round(float(t), 3) for t in times]
 
 
