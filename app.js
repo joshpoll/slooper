@@ -298,7 +298,7 @@ $('file').addEventListener('change',e=>{const f=e.target.files&&e.target.files[0
 async function loadClip(f){
   if(P===Yt&&ytReady)yt.pauseVideo();
   P=Clip;want=false;video.pause();if(objUrl)URL.revokeObjectURL(objUrl);
-  $('ytWrap').hidden=true;$('srcNote').textContent='';steps=null;$('speed').step=5;$('rateNote').textContent='';
+  $('ytWrap').hidden=true;$('srcNote').textContent='';markSong(null);steps=null;$('speed').step=5;$('rateNote').textContent='';
   S.peaks=null;S.pdur=0;S.auto=null;S.beats=[];S.bpm=0;S.dur=0;showApp();
   const st=$('status');st.textContent='Loading clip…';
   objUrl=URL.createObjectURL(f);const meta=once(video,'loadedmetadata');video.src=objUrl;video.load();
@@ -327,7 +327,6 @@ async function loadClip(f){
 }
 
 /* ---------- YouTube ---------- */
-function ytId(s){s=(s||'').trim();let m=s.match(/(?:youtu\.be\/|[?&]v=|\/shorts\/|\/embed\/|\/live\/)([\w-]{11})/);if(m)return m[1];if(/^[\w-]{11}$/.test(s))return s;return null}
 function loadApi(){
   if(window.YT&&window.YT.Player)return Promise.resolve();
   if(apiPromise)return apiPromise;
@@ -344,9 +343,8 @@ function fetchAnalysis(id){
   return fetch('analysis/'+id+'.json').then(r=>r.ok?r.json():null).then(j=>j&&Array.isArray(j.peaks)&&Array.isArray(j.beats)?j:null).catch(()=>null);
 }
 const YT_ERR={2:"That link has a bad video ID.",5:"YouTube's player hit an error on this device.",100:'This video is private, removed, or not available.',101:"This video's owner doesn't allow it to play on other sites.",150:"This video's owner doesn't allow it to play on other sites."};
-$('ytForm').addEventListener('submit',async e=>{
-  e.preventDefault();const id=ytId($('ytUrl').value),note=$('srcNote');
-  if(!id){note.textContent="That doesn't look like a YouTube link. Paste the link from the Share button.";return}
+async function loadYt(id){
+  const note=$('srcNote');store.set('cl:lastSong',id);markSong(id);
   note.textContent='Loading YouTube…';
   const ana=fetchAnalysis(id);
   try{await loadApi()}catch(err){note.textContent="YouTube can't load on this page. Open this looper from its own web address, or use Load clip with a screen recording.";return}
@@ -374,6 +372,25 @@ $('ytForm').addEventListener('submit',async e=>{
       onError:ev=>{const m=(YT_ERR[ev.data]||'YouTube could not play this video (error '+ev.data+').')+' Use Load clip with a screen recording of it instead.';
         note.textContent=m;$('status').textContent=m;want=false}
     }});
-});
+}
+
+/* ---------- song list: analysis/index.json, written by tools/analyze.py ---------- */
+let songs=[];
+const fmtDur=t=>{t=Math.round(t)||0;return Math.floor(t/60)+':'+String(t%60).padStart(2,'0')};
+// Highlight the song that is loaded (null for a clip) and fold the list away; its summary row opens it again.
+function markSong(id){
+  for(const b of $('songs').children)b.classList.toggle('on',b.dataset.id===id);
+  const s=songs.find(x=>x.id===id);$('songNow').textContent=s?s.title:'';$('songBox').open=false;
+}
+fetch('analysis/index.json',{cache:'no-cache'}).then(r=>r.ok?r.json():null).then(list=>{
+  songs=(Array.isArray(list)?list:[]).filter(x=>x&&/^[\w-]{11}$/.test(x.id));
+  if(!songs.length)throw new Error('empty');
+  const last=store.get('cl:lastSong'),i=songs.findIndex(x=>x.id===last);
+  if(i>0)songs.unshift(...songs.splice(i,1)); // the last song first
+  $('songs').replaceChildren(...songs.map(x=>{const b=document.createElement('button');b.className='song';b.dataset.id=x.id;
+    b.innerHTML='<span></span><span class="dur"></span>';b.firstChild.textContent=x.title||x.id;b.lastChild.textContent=fmtDur(x.duration);
+    b.onclick=()=>loadYt(x.id);return b}));
+  if(i>=0)$('songs').firstChild.classList.add('on');
+}).catch(()=>{$('songBox').hidden=true;$('srcNote').textContent="The song list didn't load. Tap Load clip to open a video or audio file."});
 requestAnimationFrame(tick);
 })();

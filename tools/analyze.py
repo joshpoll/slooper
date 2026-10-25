@@ -11,7 +11,12 @@
 Usage: uv run tools/analyze.py <youtube-url-or-id> [more ...] [--force]
 
 Writes analysis/<videoId>.json next to this repo's tools/ directory:
-  {"duration": s, "peaks": [0..1 x ~4000], "beats": [s, ...], "bpm": n}
+  {"title": str, "duration": s, "peaks": [0..1 x ~4000], "beats": [s, ...], "bpm": n}
+and then rebuilds analysis/index.json, the song list the app shows:
+  [{"id": str, "title": str, "duration": s}, ...]  (sorted by title)
+
+A video whose JSON already exists is skipped; if that JSON has no title yet,
+only the title is fetched and added.
 
 yt-dlp and ffmpeg are called as external binaries (Homebrew), so updating
 yt-dlp is just `brew upgrade yt-dlp` and never depends on a pinned Python
@@ -59,12 +64,23 @@ def parse_video_id(s: str) -> str:
     raise AnalyzeError(f"could not find a YouTube video ID in {s!r}")
 
 
-def download_audio(video_id: str, tmp: Path) -> Path:
+def yt_dlp_error(video_id: str, proc: subprocess.CompletedProcess) -> AnalyzeError:
+    detail = (proc.stderr or proc.stdout).strip() or f"exit code {proc.returncode}"
+    return AnalyzeError(
+        f"yt-dlp failed for {video_id}:\n{detail}\n"
+        "YouTube changes often; try `brew upgrade yt-dlp` and run again."
+    )
+
+
+def download_audio(video_id: str, tmp: Path) -> tuple[Path, str]:
+    """Download the audio and return (file, video title)."""
     cmd = [
         "yt-dlp",
         "--no-playlist",
         "--quiet",
         "--no-warnings",
+        "--print", "title",
+        "--no-simulate",
         "-f", "bestaudio/best",
         "-o", str(tmp / "audio.%(ext)s"),
         f"https://www.youtube.com/watch?v={video_id}",
@@ -72,12 +88,17 @@ def download_audio(video_id: str, tmp: Path) -> Path:
     proc = subprocess.run(cmd, capture_output=True, text=True)
     files = [p for p in tmp.glob("audio.*") if not p.name.endswith(".part")]
     if proc.returncode != 0 or not files:
-        detail = (proc.stderr or proc.stdout).strip() or f"exit code {proc.returncode}"
-        raise AnalyzeError(
-            f"yt-dlp failed for {video_id}:\n{detail}\n"
-            "YouTube changes often; try `brew upgrade yt-dlp` and run again."
-        )
-    return files[0]
+        raise yt_dlp_error(video_id, proc)
+    return files[0], proc.stdout.strip()
+
+
+def fetch_title(video_id: str) -> str:
+    cmd = ["yt-dlp", "--no-playlist", "--no-warnings", "--print", "title",
+           f"https://www.youtube.com/watch?v={video_id}"]
+    proc = subprocess.run(cmd, capture_output=True, text=True)
+    if proc.returncode != 0:
+        raise yt_dlp_error(video_id, proc)
+    return proc.stdout.strip()
 
 
 def decode_audio(path: Path) -> np.ndarray:
@@ -124,14 +145,29 @@ def compute_beats(y: np.ndarray) -> tuple[float, list[float]]:
 
 def analyze(video_id: str) -> dict:
     with tempfile.TemporaryDirectory(prefix="slooper-") as d:
-        y = decode_audio(download_audio(video_id, Path(d)))
+        audio, title = download_audio(video_id, Path(d))
+        y = decode_audio(audio)
     bpm, beats = compute_beats(y)
     return {
+        "title": title or video_id,
         "duration": round(y.size / SR, 3),
         "peaks": compute_peaks(y),
         "beats": beats,
         "bpm": bpm,
     }
+
+
+def write_index() -> Path:
+    songs = []
+    for p in OUT_DIR.glob("*.json"):
+        if p.name == "index.json":
+            continue
+        d = json.loads(p.read_text())
+        songs.append({"id": p.stem, "title": d.get("title") or p.stem, "duration": d.get("duration", 0)})
+    songs.sort(key=lambda s: s["title"].casefold())
+    out = OUT_DIR / "index.json"
+    out.write_text(json.dumps(songs, indent=1, ensure_ascii=False) + "\n")
+    return out
 
 
 def main() -> int:
@@ -152,10 +188,15 @@ def main() -> int:
             vid = parse_video_id(arg)
             out = OUT_DIR / f"{vid}.json"
             if out.exists() and not args.force:
+                data = json.loads(out.read_text())
+                if not data.get("title"):
+                    data = {"title": fetch_title(vid) or vid, **data}
+                    out.write_text(json.dumps(data, separators=(",", ":"), ensure_ascii=False))
+                    print(f"{vid}: added title {data['title']!r}")
                 print(f"{vid}: skipped, {out.relative_to(OUT_DIR.parent)} exists (use --force)")
                 continue
             result = analyze(vid)
-            out.write_text(json.dumps(result, separators=(",", ":")))
+            out.write_text(json.dumps(result, separators=(",", ":"), ensure_ascii=False))
             print(
                 f"{vid}: duration {result['duration']:.1f}s, bpm {result['bpm']}, "
                 f"{len(result['beats'])} beats, {out.stat().st_size / 1024:.1f} KB "
@@ -164,6 +205,8 @@ def main() -> int:
         except AnalyzeError as e:
             failed += 1
             print(f"error: {e}", file=sys.stderr)
+    index = write_index()
+    print(f"wrote {index.relative_to(OUT_DIR.parent)}")
     return 1 if failed else 0
 
 

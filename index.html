@@ -28,20 +28,21 @@
 
 <main class="wrap">
   <section class="panel">
-    <form id="ytForm" class="source">
-      <input id="ytUrl" type="url" inputmode="url" autocomplete="off" placeholder="Paste a YouTube link" value="https://youtu.be/Mwi9E-ztPuU" aria-label="YouTube link">
-      <button type="submit" class="solid btn">Open</button>
-    </form>
+    <details id="songBox" class="songs" open>
+      <summary><span class="label">Songs</span><span id="songNow" class="song-now"></span></summary>
+      <div id="songs" class="song-list"></div>
+    </details>
     <div id="srcNote" class="note"></div>
   </section>
 
   <section id="empty" class="panel empty">
     <h1>Slow it down, loop it, count yourself in.</h1>
     <ol>
-      <li>Open a YouTube link above, or tap <b>Load clip</b> for a video or audio file (a screen recording works).</li>
+      <li>Pick a song from the list above, or tap <b>Load clip</b> for a video or audio file (a screen recording works).</li>
       <li>Drag the red A and B markers, set a speed, and press Play.</li>
-      <li>Clips get a waveform and automatic beats. YouTube videos get them too if the song has been analyzed; otherwise tap <b>Tap beat</b> along with the music to lay down the eight-count.</li>
+      <li>Songs in the list come with a waveform and beats, and so do clips. If the counts are off, tap <b>Tap beat</b> along with the music to lay down the eight-count.</li>
     </ol>
+    <p>To add a song to the list, run <code>uv run tools/analyze.py</code> with its YouTube link on the laptop, then commit and push. The song shows up here once the site updates.</p>
     <p>Loop points, speed and beat grid are remembered for each video.</p>
   </section>
 

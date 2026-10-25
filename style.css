@@ -101,12 +101,23 @@ input[type=range]{width:100%;accent-color:var(--tape);height:32px;margin:10px 0 
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 
 /* sources + YouTube + tap tempo */
-.source{display:flex;gap:8px;flex-wrap:wrap}
-.source input{flex:1 1 220px;min-width:0;font:inherit;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px 12px;min-height:44px}
 .yt{width:100%;aspect-ratio:16/9;max-height:42vh}
 .yt iframe,.yt>div{width:100%;height:100%;display:block;border:0}
 .note{font-size:13px;color:var(--muted);margin-top:6px;min-height:1.2em}
 .tapbtn[aria-pressed="true"]{border-color:var(--tape)}
+/* song list (analysis/index.json) */
+.songs summary{display:flex;align-items:center;gap:10px;min-height:44px;cursor:pointer;list-style:none;-webkit-tap-highlight-color:transparent}
+.songs summary::-webkit-details-marker{display:none}
+.songs summary::after{content:"";margin-left:auto;width:8px;height:8px;border:solid var(--muted);border-width:0 2px 2px 0;transform:rotate(45deg);flex:none}
+.songs[open] summary::after{transform:rotate(-135deg)}
+.song-now{font-weight:700;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.song-list{display:grid;gap:8px;margin-top:8px}
+.song{justify-content:flex-start;text-align:left;width:100%}
+.song .dur{margin-left:auto;color:var(--muted);font-variant-numeric:tabular-nums;flex:none}
+.song.on{border-color:var(--tape)}
+.song.on::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--tape-fill);flex:none}
+#srcNote:empty{display:none}
+.empty code{font-size:13px;color:var(--fg)}
 .empty .or{font-size:13px;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;font-weight:700}
 
 /* beat-grid tools */

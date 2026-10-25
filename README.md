@@ -6,7 +6,7 @@ It is built for one dancer practicing on an iPhone in Safari. It is a plain stat
 
 ## How to use it
 
-1. Paste a YouTube link and tap **Open**, or tap **Load clip** to open a video or audio file from your phone. A screen recording works.
+1. Pick a song from the **Songs** list, or tap **Load clip** to open a video or audio file from your phone. A screen recording works. The list puts the song you used last at the top. After a song loads, the list folds up. Tap **Songs** to open it again.
 2. Drag the red A and B markers on the timeline to choose the section to loop. The ‹ and › buttons move a marker by one beat, and **Set to playhead** puts it where the video is now.
 3. Set the speed and press **Play**. With the lead-in on, each loop starts 3 seconds before A.
 
@@ -26,18 +26,18 @@ To put it on your home screen, open the site in Safari, tap Share, then tap **Ad
 
 Clips get a waveform and beats right away, because the app reads the audio in the browser.
 
-A web page can't read the audio of a YouTube video. So for YouTube, the waveform and beats come from a file that is made ahead of time on a laptop and committed to this repo. When you open a video, the app looks for `analysis/<videoId>.json`. If the file is there, you get a waveform and beats. If it is not, the app works as before and you can use **Tap beat**.
+A web page can't read the audio of a YouTube video. So for YouTube, the waveform and beats come from a file that is made ahead of time on a laptop and committed to this repo. Each song has a file `analysis/<videoId>.json`. The file `analysis/index.json` lists all the songs, and the app shows that list.
 
-## Adding a song's analysis
+## Adding a song
 
-From the repo root, run the analysis script with the YouTube link or video ID, then commit and push the new file:
+From the repo root, run the analysis script with the YouTube link or video ID. Then commit and push the new files:
 
 ```sh
 uv run tools/analyze.py https://youtu.be/Mwi9E-ztPuU
 git add analysis && git commit -m "Add analysis" && git push
 ```
 
-The script writes `analysis/<videoId>.json`. See `tools/README.md` for what it needs installed.
+The script writes `analysis/<videoId>.json` and updates the song list in `analysis/index.json`. Once GitHub Pages has updated, which takes a minute or two, the song shows up in the list in the app. See `tools/README.md` for what the script needs installed.
 
 Downloading audio from YouTube may conflict with YouTube's terms of service. The script uses yt-dlp, which breaks from time to time when YouTube changes. If it stops working, update it with `brew upgrade yt-dlp`.
 
