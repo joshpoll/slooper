@@ -38,7 +38,7 @@
   <section id="empty" class="panel empty">
     <h1>Slow it down, loop it, count yourself in.</h1>
     <ol>
-      <li>Pick a song from the list above, or tap <b>Load clip</b> for a video or audio file (a screen recording works).</li>
+      <li>The last song you used opens here by itself. To switch, pick another from the list above, or tap <b>Load clip</b> for a video or audio file (a screen recording works).</li>
       <li>Drag the red A and B markers, set a speed, and press Play.</li>
       <li>Songs in the list come with a waveform and beats, and so do clips. If the counts are off, tap <b>Tap beat</b> along with the music to lay down the eight-count.</li>
     </ol>
@@ -70,7 +70,7 @@
           <button id="tapClear" hidden>Clear</button>
         </div>
       </div>
-      <div class="canvas-wrap" id="cwrap"><canvas id="wave" aria-label="Timeline. Tap to seek, drag to scroll, drag A or B to move the loop."></canvas></div>
+      <div class="canvas-wrap" id="cwrap"><canvas id="wave" aria-label="Timeline. Tap to seek, drag to scroll, drag A or B to move the loop, double-tap to clear the loop."></canvas><button id="recenter" class="recenter" hidden>Re-center</button></div>
       <div id="gridTools" class="gridtools" hidden>
         <div class="seg" role="group" aria-label="Tempo">
           <button id="half" title="Halve the tempo">½× tempo</button>
@@ -82,7 +82,7 @@
           <button id="onePlus" aria-label="Move the 1 one beat later, for the whole song">›</button>
         </div>
       </div>
-      <div id="status" class="status">Tap the timeline to jump there. Drag it to scroll. Drag A or B to move the loop.</div>
+      <div id="status" class="status">Tap the timeline to jump there. Drag it to scroll. Drag A or B to move the loop. Double-tap to clear the loop.</div>
     </div>
 
     <div class="panel">

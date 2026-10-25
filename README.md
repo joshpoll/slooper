@@ -6,9 +6,13 @@ It is built for one dancer practicing on an iPhone in Safari. It is a plain stat
 
 ## How to use it
 
-1. Pick a song from the **Songs** list, or tap **Load clip** to open a video or audio file from your phone. A screen recording works. The list puts the song you used last at the top. After a song loads, the list folds up. Tap **Songs** to open it again.
-2. Drag the red A and B markers on the timeline to choose the section to loop. The ‹ and › buttons move a marker by one beat, and **Set to playhead** puts it where the video is now. **Undo** puts the markers back where they were before your last change. Press it again to step further back. Drag anywhere else on the timeline to scroll it, and tap to jump there. The − and + buttons zoom out and in, **Fit loop** shows the whole loop, and **Fit song** shows the whole song. The zoom stays where you put it, and while the song plays the timeline turns a page when the playhead reaches the edge. Thin lines mark each "1".
+1. When the page opens, it loads the song you used last, or the first song in the list. To switch, pick another song from the **Songs** list, or tap **Load clip** to open a video or audio file from your phone. A screen recording works. After a song loads, the list folds up. Tap **Songs** to open it again.
+2. Drag the red A and B markers on the timeline to choose the section to loop. The ‹ and › buttons move a marker by one beat, and **Set to playhead** puts it where the video is now. **Undo** puts the markers back where they were before your last change. Press it again to step further back.
 3. Set the speed and press **Play**. To type a speed, tap the percentage. With the lead-in on, each loop starts 3 seconds before A.
+
+On the timeline, tap to jump there, and drag anywhere away from the markers to scroll it. Double-tap to clear the loop. With no loop, Play just plays the song from the playhead. To make a new loop, tap **Set to playhead** under A or B. That makes a loop about 8 beats long, starting or ending at the playhead, and then you can drag its markers. **Undo** brings back a loop you cleared.
+
+The − and + buttons zoom out and in, **Fit loop** shows the whole loop, and **Fit song** shows the whole song. The zoom stays where you put it. Thin lines mark each "1". While the song plays, the timeline scrolls so the playhead stays about a quarter of the way in from the left, like a map app following you. When you scroll the timeline yourself, or tap Fit loop or Fit song, it stops following and shows a **Re-center** button. Tap Re-center, Play, Restart, or a spot on the timeline to follow the playhead again.
 
 The count strip lights up the current count. The "1" belongs to the song, so it stays on the same beat wherever you put A. The label next to A shows which count A is on. If the counts are off:
 
