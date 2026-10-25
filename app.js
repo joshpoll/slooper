@@ -4,15 +4,15 @@ const video=$('vid'), canvas=$('wave'), ctx=canvas.getContext('2d');
 const LEAD=3; // real seconds of lead-in
 // a,b: the loop, or both null when there is no loop (then playback runs straight through).
 // zw: timeline view width in seconds (0 = not set yet), v0: view start.
-// grid: tapped beat grid {a,p}. auto: detected beats {beats,bpm} (clip analysis or analysis/<id>.json). oct: tempo halved/doubled this many times.
-// shift: index (mod 8) in S.beats of a beat that counts as "1"; it belongs to the song, not to A. phase: when halved (oct<0), which base beats are kept (index mod 2^-oct).
-const S={a:20,b:44,rate:100,lead:true,snap:true,repeat:true,click:false,big:false,zw:0,v0:0,dur:0,peaks:null,pdur:0,beats:[],bpm:0,grid:null,auto:null,oct:0,shift:0,phase:0,key:null};
+// beats, bpm: the beat grid, from analysis/<id>.json for YouTube or the in-browser detection for clips (empty = no grid).
+// one: index in beats of a beat that is a "1". It belongs to the song (from the analysis file; 0 for clips), not to A.
+const S={a:20,b:44,rate:100,lead:true,snap:true,repeat:true,click:false,big:false,zw:0,v0:0,dur:0,peaks:null,pdur:0,beats:[],bpm:0,one:0,key:null};
 let objUrl=null, dirty=true, freeSeek=false, drag=null, wake=null, want=false;
 
 const store={get(k){try{return JSON.parse(localStorage.getItem(k))}catch(e){return null}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
 const PREFS=['rate','lead','snap','repeat','click','big'];
 const prefs=store.get('cl:prefs'); if(prefs){for(const k of PREFS) if(k in prefs) S[k]=prefs[k];}
-function save(){const v={a:S.a,b:S.b,rate:S.rate,lead:S.lead,snap:S.snap,repeat:S.repeat,zw:S.zw,grid:S.grid,oct:S.oct,shift:S.shift,phase:S.phase};if(S.key)store.set(S.key,v);const p={};for(const k of PREFS)p[k]=S[k];store.set('cl:prefs',p);}
+function save(){const v={a:S.a,b:S.b,rate:S.rate,lead:S.lead,snap:S.snap,repeat:S.repeat,zw:S.zw};if(S.key)store.set(S.key,v);const p={};for(const k of PREFS)p[k]=S[k];store.set('cl:prefs',p);}
 
 const fmt=t=>{if(!isFinite(t))t=0;t=Math.max(0,t);const m=Math.floor(t/60),s=t-m*60;return m+':'+(s<10?'0':'')+s.toFixed(1)};
 const hasLoop=()=>S.a!==null;
@@ -65,7 +65,7 @@ function probeYtRates(){
 function nearestIdx(b,t){let lo=0,hi=b.length-1;if(hi<0)return -1;while(hi-lo>1){const m=(lo+hi)>>1;if(b[m]<t)lo=m;else hi=m}return Math.abs(b[lo]-t)<=Math.abs(b[hi]-t)?lo:hi}
 const nearestBeatIdx=t=>nearestIdx(S.beats,t);
 const useSnap=()=>S.snap&&S.beats.length>0;
-const oneIdx=()=>S.shift; // index of a beat that counts as "1" (fixed for the song, independent of A)
+const oneIdx=()=>S.one;
 const countOf=(i,one)=>(((i-one)%8)+8)%8; // 0 means "1"
 function snap(t){if(useSnap())return S.beats[nearestBeatIdx(t)];return Math.round(t*10)/10}
 function nudge(t,dir){if(useSnap()){let i=nearestBeatIdx(t);if(Math.abs(S.beats[i]-t)>0.02){i=dir>0?(S.beats[i]>t?i:i+1):(S.beats[i]<t?i:i-1)}else i+=dir;i=Math.max(0,Math.min(S.beats.length-1,i));return S.beats[i]}return Math.round((t+dir)*10)/10}
@@ -82,39 +82,13 @@ function setB(t){const m=mark();if(!hasLoop())S.a=Math.max(0,snap(t-loopLen()));
 function clearLoop(){if(!hasLoop())return;const m=mark();S.a=S.b=null;record(m);render();save();
   $('status').textContent='Loop cleared. Play runs straight through. Set A or B to the playhead to make a new loop, or tap Undo to get this one back.'}
 function snapAB(){if(!useSnap()||!hasLoop())return;const m=mark();S.a=snap(S.a);S.b=Math.max(snap(S.b),S.a+0.5);record(m)}
-function gridBeats(g,dur){const out=[];if(!g||!(g.p>0.2))return out;let k=Math.ceil((0-g.a)/g.p);for(let t=g.a+k*g.p;t<=dur;t+=g.p)out.push(t);return out}
-function doubleBeats(B){const o=[];for(let i=0;i<B.length;i++){o.push(B[i]);if(i+1<B.length)o.push((B[i]+B[i+1])/2)}return o}
-// A tapped grid wins over detected beats; half/double applies to whichever is in use.
-function useBeats(){
-  let B=[],bpm=0;
-  if(S.grid){B=gridBeats(S.grid,S.dur);bpm=60/S.grid.p}
-  else if(S.auto){B=S.auto.beats;bpm=S.auto.bpm}
-  for(let k=0;k<S.oct;k++)B=doubleBeats(B);
-  if(S.oct<0){const m=1<<-S.oct;B=B.filter((_,i)=>i%m===S.phase%m)} // halved: keep every m-th beat, starting at phase
-  S.beats=B;S.bpm=B.length?bpm*Math.pow(2,S.oct):0;
-  $('tapClear').hidden=!S.grid;$('tapClear').textContent=S.auto?'Use detected':'Clear';
-  $('gridTools').hidden=!B.length;
-}
 // New waveform and detected beats, from clip analysis or a fetched analysis file.
-function gotAnalysis(peaks,pdur,beats,bpm,saved){
-  S.peaks=peaks;S.pdur=pdur;S.auto=beats.length?{beats,bpm}:null;useBeats();
+function gotAnalysis(peaks,pdur,beats,bpm,one,saved){
+  S.peaks=peaks;S.pdur=pdur;S.beats=beats;S.bpm=beats.length?bpm:0;S.one=Math.max(0,one|0);
   if(!saved){snapAB();clearUndo()} // snapping the default loop on load is not a change to undo
   if(zwAuto)S.zw=defW(); // default zoom: about 10 eight-counts, now that the beat is known
   render();
 }
-// Keep the downbeat when the tempo changes: find the "1" in base-beat units (the list before halving/doubling),
-// then re-express it in the new list. Doubling: base beat i is new beat 2i. Halving: pick the phase that keeps the "1".
-// If the "1" sat on a beat the new list drops (a doubled-in midpoint), the beat just before it becomes the "1".
-function setOct(d){
-  const o=Math.max(-2,Math.min(2,S.oct+d));if(o===S.oct)return;
-  const bi=S.oct>=0?S.shift/(1<<S.oct):S.phase+S.shift*(1<<-S.oct); // base index of the "1" (fractional = midpoint)
-  if(o>=0){S.shift=Math.floor(bi*(1<<o))%8;S.phase=0}
-  else{const m=1<<-o,f=Math.floor(bi);S.phase=f%m;S.shift=((f-S.phase)/m)%8}
-  S.oct=o;useBeats();snapAB();
-  render();save();$('status').textContent=(d>0?'Tempo doubled':'Tempo halved')+(S.bpm?' to about '+Math.round(S.bpm)+' BPM.':'.');
-}
-function shiftOne(d){S.shift=(S.shift+d+8)%8;render();save()}
-
 function analyze(mono,sr){
   const N=Math.min(8000,Math.max(500,(mono.length/64)|0)), bs=mono.length/N, peaks=new Float32Array(N);let mx=1e-6;
   for(let i=0;i<N;i++){let m=0;const s=(i*bs)|0,e=Math.min(mono.length,((i+1)*bs)|0);for(let j=s;j<e;j+=2){const v=Math.abs(mono[j]);if(v>m)m=v}peaks[i]=m;if(m>mx)mx=m}
@@ -139,28 +113,6 @@ function analyze(mono,sr){
   return {peaks,beats:fr2.map(f=>(f*hop+win/2)/sr),bpm:60*fr/Pd};
 }
 
-/* ---------- tap tempo (media time, so it works at any speed) ---------- */
-let taps=[],lastTapWall=0,freshTaps=true;
-function fitTaps(){
-  if(taps.length<4)return null;
-  const d=[];for(let i=1;i<taps.length;i++)d.push(taps[i]-taps[i-1]);d.sort((x,y)=>x-y);
-  const p0=d[d.length>>1];if(!(p0>0.25&&p0<1.6))return null;
-  const n=taps.map(t=>Math.round((t-taps[0])/p0));
-  let sn=0,st=0,snn=0,snt=0;const m=taps.length;for(let i=0;i<m;i++){sn+=n[i];st+=taps[i];snn+=n[i]*n[i];snt+=n[i]*taps[i]}
-  const den=m*snn-sn*sn;if(den<=0)return null;const p=(m*snt-sn*st)/den,a=(st-p*sn)/m;
-  return p>0.25&&p<1.6?{a,p}:null;
-}
-$('tap').onclick=()=>{
-  if(!S.dur)return;const now=performance.now(),t=P.time();
-  if(P.paused()){$('status').textContent='Press Play, then tap along on each beat.';return}
-  if(now-lastTapWall>2500){taps=[];freshTaps=true}lastTapWall=now;taps.push(t);if(taps.length>16)taps.shift();
-  $('tap').setAttribute('aria-pressed','true');setTimeout(()=>$('tap').setAttribute('aria-pressed','false'),120);
-  const g=fitTaps();
-  if(g){S.grid=g;if(freshTaps){S.oct=0;S.shift=0;S.phase=0;freshTaps=false}useBeats();render();save();$('status').textContent='Beat grid set from '+taps.length+' taps. Keep tapping to refine. Use Move the 1 if the 1 is on the wrong beat.'}
-  else $('status').textContent='Keep tapping… ('+taps.length+')';
-};
-$('tapClear').onclick=()=>{S.grid=null;S.oct=0;S.shift=0;S.phase=0;taps=[];useBeats();render();save();$('status').textContent=S.auto?'Back to the detected beats.':'Beat grid cleared.'};
-
 /* ---------- lead-in click ---------- */
 let ac=null,clicks=[],clickArm=false;
 function audioCtx(){if(!ac){const AC=window.AudioContext||window.webkitAudioContext;if(!AC)return null;ac=new AC()}if(ac.state==='suspended')ac.resume().catch(()=>{});return ac}
@@ -182,26 +134,35 @@ const TICKS=[1,2,5,10,15,30,60,120,300,600]; // time label spacing, seconds
 const beatLen=()=>S.bpm?60/S.bpm:0.5; // without a beat grid, act as if 120 BPM, so 10 eights = 40 s
 const defW=()=>80*beatLen();
 // zwAuto: the width is the default and may be redone once beats arrive.
-// follow: like map navigation, the view scrolls so the playhead stays FOLLOW of the way in (clamped at the song's ends).
-// Dragging the timeline turns it off; Re-center, Play, Restart and tap-to-seek turn it back on.
+// Following, like a map app: the view scrolls so the playhead holds one screen spot, followAt (a fraction of the width; null = off).
+// followAt is wherever the playhead is when following starts (a tap, or Play), or FOLLOW after Re-center.
+// Panning and the Fit buttons turn it off. At the song's ends the view stops and the playhead moves instead.
 const FOLLOW=0.25;
-let zwAuto=true, follow=true;
-function setFollow(on){follow=on;$('recenter').hidden=on;dirty=true}
+let zwAuto=true, followAt=FOLLOW;
+function setFollow(at){followAt=at;$('recenter').hidden=at!==null;dirty=true}
+const headFrac=()=>{const [v0,v1]=range();return (P.time()-v0)/(v1-v0)};
+const onScreen=f=>f>=0&&f<=1;
+// Play and Restart: keep following, or start from the playhead's screen spot (FOLLOW if it is off screen).
+function followHere(){if(followAt===null){const f=headFrac();setFollow(onScreen(f)?f:FOLLOW)}}
 function vw(){const D=S.dur||1;return Math.min(D,Math.max(1,S.zw||defW()))}
 function range(){const W=vw();S.v0=Math.max(0,Math.min((S.dur||1)-W,S.v0||0));return[S.v0,S.v0+W]}
 function setView(v0,w){S.zw=w;S.v0=v0;zwAuto=false;range();dirty=true;save()}
+// Zoom to width w, keeping the time at screen fraction f in place. While following, zoom around the playhead instead, so it keeps its spot.
+function zoomAt(w,f){const D=S.dur||1,[v0]=range(),W=vw();w=Math.min(D,Math.max(1,w));
+  if(followAt!==null&&onScreen(headFrac()))f=headFrac();
+  setView(v0+f*W-f*w,w)}
+// The − and + buttons step to the next fixed level (the wheel zooms smoothly between them).
 function zoom(d){ // d>0 zooms in
   const W=vw(),L=EIGHTS.map(n=>n*8*beatLen()).filter(w=>w<(S.dur||1));
   let w=d>0?L.slice().reverse().find(w=>w<W*0.98):L.find(w=>w>W*1.02);
   if(w===undefined)w=d>0?W:(S.dur||1);
-  const [v0,v1]=range(),t=P.time(),f=(t>=v0&&t<=v1)?(t-v0)/W:0.5; // keep the playhead (or the middle) where it is
-  setView(v0+f*W-f*w,w);
+  const f=headFrac();zoomAt(w,onScreen(f)?f:0.5); // keep the playhead (or the middle) where it is
 }
 // Fit loop and Fit song choose what is on screen, so they stop following like a pan does.
-function fitLoop(){if(!hasLoop())return;const s=pre(),m=Math.max(0.5,(S.b-s)*0.08);setFollow(false);setView(s-m,S.b-s+2*m)}
-function fitSong(){setFollow(false);setView(0,S.dur||1)}
+function fitLoop(){if(!hasLoop())return;const s=pre(),m=Math.max(0.5,(S.b-s)*0.08);setFollow(null);setView(s-m,S.b-s+2*m)}
+function fitSong(){setFollow(null);setView(0,S.dur||1)}
 // Called every frame: glide to a far target (a seek or a loop wrap), track exactly once close.
-function followHead(t){if(!follow)return;const W=vw(),to=Math.max(0,Math.min((S.dur||1)-W,t-FOLLOW*W)),d=to-S.v0;
+function followHead(t){if(followAt===null)return;const W=vw(),to=Math.max(0,Math.min((S.dur||1)-W,t-followAt*W)),d=to-S.v0;
   if(Math.abs(d)>1e-4){S.v0=Math.abs(d)<0.1*W?to:S.v0+d*0.25;dirty=true}}
 const mss=k=>Math.floor(k/60)+':'+String(k%60).padStart(2,'0');
 function tok(cs,n){return cs.getPropertyValue(n).trim()}
@@ -257,11 +218,11 @@ function render(){
 }
 
 async function lockScreen(){try{if('wakeLock'in navigator&&!wake){wake=await navigator.wakeLock.request('screen');wake.addEventListener('release',()=>wake=null)}}catch(e){}}
-function startLoop(){freeSeek=false;setFollow(true);want=true;clickArm=true;P.seek(pre());applyRate();P.play()}
+function startLoop(){freeSeek=false;followHere();want=true;clickArm=true;P.seek(pre());applyRate();P.play()}
 function togglePlay(){
   if(S.click)audioCtx(); // unlock Web Audio inside the tap
   if(!P.paused()){want=false;P.pause();return}
-  const t=P.time();want=true;clickArm=true;setFollow(true);
+  const t=P.time();want=true;clickArm=true;followHere();
   if(hasLoop()&&!freeSeek&&(t<pre()-0.25||t>=S.b-0.05))startLoop();else{applyRate();P.play()}
   lockScreen();
   if(P===Yt)setTimeout(()=>{if(P===Yt&&want&&P.paused())$('status').textContent="If the video doesn't start, tap the video itself once. After that, Play works from here."},2500);
@@ -270,12 +231,15 @@ function togglePlay(){
 /* ---------- eight-count strip ---------- */
 const counter=$('counter'),slots=[];
 for(let k=0;k<8;k++){const c=document.createElement('span');c.className='cell'+(k===0?' first':'');c.textContent=k+1;const a=document.createElement('span');a.className='and';a.textContent='&';counter.append(c,a);slots.push(c,a)}
+// A count lights when the playhead reaches its beat (or the midpoint, for "&"), AHEAD seconds early: the class change
+// reaches the screen one to two frames after this frame starts, so lighting a frame or so early makes it show on the beat.
+const AHEAD=0.03;
 let lastSlot=-2;
 function updateCounter(t){
   const B=S.beats;counter.hidden=!B.length;if(!B.length)return;
-  let i=nearestBeatIdx(t);if(B[i]>t+0.03)i--;
+  const u=t+AHEAD;let i=nearestBeatIdx(u);if(B[i]>u)i--; // i: the last beat at or before u
   let slot=-1;
-  if(i>=0&&i<B.length-1){const c=countOf(i,oneIdx());slot=c*2+(t>=(B[i]+B[i+1])/2?1:0)}
+  if(i>=0&&i<B.length-1){const c=countOf(i,oneIdx());slot=c*2+(u>=(B[i]+B[i+1])/2?1:0)}
   if(slot===lastSlot)return;
   if(lastSlot>=0&&slots[lastSlot])slots[lastSlot].classList.remove('on');
   if(slot>=0)slots[slot].classList.add('on');
@@ -306,32 +270,54 @@ function tick(){
 
 /* ---------- timeline pointer ---------- */
 function tAt(ev){const r=canvas.getBoundingClientRect(),[v0,v1]=range();return v0+Math.max(0,Math.min(1,(ev.clientX-r.left)/r.width))*(v1-v0)}
-// A press on the A or B tab drags that marker (one undo entry per drag). Any other press is a tap or a pan:
-// moving 6 px makes it a pan (and stops following); letting go before that is a tap, which seeks there.
+// The A or B tab under the pointer, or null.
+function markerAt(ev){if(!hasLoop())return null;const r=canvas.getBoundingClientRect(),[v0,v1]=range(),X=t=>(t-v0)/(v1-v0)*r.width,x=ev.clientX-r.left;
+  const da=Math.abs(x-X(S.a)-8),db=Math.abs(x-X(S.b)+8);return Math.min(da,db)<26?(da<=db?'a':'b'):null}
+// Loop selection: the loop spans the press time t0 and t, in either direction, snapped, at least 0.5 s long.
+function selectTo(t0,t){const D=S.dur;let a=snap(Math.min(t0,t)),b=snap(Math.max(t0,t));
+  if(b-a<0.5){if(t<t0)a=b-0.5;else b=a+0.5}
+  if(a<0){a=0;b=Math.max(b,0.5)}if(b>D){b=D;a=Math.max(0,Math.min(a,D-0.5))}
+  S.a=a;S.b=b;render()}
+// A tap seeks there without moving the view; following carries on with the playhead held at the tapped spot.
 // Two taps within 300 ms and 30 px of each other clear the loop.
 let lastTap=null; // {at, x} of the previous tap
+function tapAt(ev){const r=canvas.getBoundingClientRect(),now=performance.now(),dbl=lastTap&&now-lastTap.at<300&&Math.abs(ev.clientX-lastTap.x)<30;
+  lastTap=dbl?null:{at:now,x:ev.clientX};
+  freeSeek=true;setFollow(Math.max(0,Math.min(1,(ev.clientX-r.left)/r.width)));P.seek(tAt(ev));
+  if(dbl)clearLoop()}
+// A press on the A or B tab drags that marker (one undo entry per drag). Any other press is a tap, unless it moves:
+// - Mouse or pen: dragging 4 px selects a new loop, like selecting text. Desktop pans with the wheel or trackpad instead.
+// - Touch: moving 6 px pans (and stops following), since touch has no wheel. Holding still for 400 ms switches to loop selection.
 canvas.addEventListener('pointerdown',ev=>{
-  if(!S.dur)return;const r=canvas.getBoundingClientRect(),[v0,v1]=range(),X=t=>(t-v0)/(v1-v0)*r.width,x=ev.clientX-r.left;
-  const da=hasLoop()?Math.abs(x-X(S.a)-8):Infinity,db=hasLoop()?Math.abs(x-X(S.b)+8):Infinity;
-  if(Math.min(da,db)<26)drag={what:da<=db?'a':'b',mark:mark()};else drag={what:'pan',x:ev.clientX,v0,moved:false};
+  if(!S.dur)return;const m=markerAt(ev),base={x:ev.clientX,t0:tAt(ev),mark:mark(),moved:false};
+  if(m)drag={...base,what:m};
+  else if(ev.pointerType==='touch'){drag={...base,what:'pan',v0:S.v0};const d=drag;
+    d.timer=setTimeout(()=>{if(drag===d&&!d.moved){d.what='sel';d.moved=true;selectTo(d.t0,d.t0);if(navigator.vibrate)navigator.vibrate(10)}},400)}
+  else drag={...base,what:'sel'};
   canvas.setPointerCapture(ev.pointerId);ev.preventDefault();dirty=true;
 });
-canvas.addEventListener('pointermove',ev=>{if(!drag)return;
-  if(drag.what==='pan'){const dx=ev.clientX-drag.x;if(!drag.moved&&Math.abs(dx)<6)return;
-    if(!drag.moved){drag.moved=true;setFollow(false)}S.v0=drag.v0-dx/canvas.getBoundingClientRect().width*vw();range();dirty=true;return}
+canvas.addEventListener('pointermove',ev=>{
+  if(!drag){if(ev.pointerType!=='touch')canvas.style.cursor=markerAt(ev)?'ew-resize':'';return}
+  const dx=ev.clientX-drag.x;
+  if(drag.what==='pan'){if(!drag.moved&&Math.abs(dx)<6)return;
+    if(!drag.moved){drag.moved=true;clearTimeout(drag.timer);setFollow(null)}S.v0=drag.v0-dx/canvas.getBoundingClientRect().width*vw();range();dirty=true;return}
+  if(drag.what==='sel'){if(!drag.moved&&Math.abs(dx)<4)return;drag.moved=true;selectTo(drag.t0,tAt(ev));return}
   const t=tAt(ev);
   if(drag.what==='a'){S.a=Math.max(0,Math.min(snap(t),S.b-0.5))}else{S.b=Math.min(S.dur,Math.max(snap(t),S.a+0.5))}
   render()});
 const endDrag=ev=>{
-  if(!drag)return;
-  if(drag.what!=='pan'){record(drag.mark);save()}
-  else if(!drag.moved&&ev.type==='pointerup'){
-    const now=performance.now(),dbl=lastTap&&now-lastTap.at<300&&Math.abs(ev.clientX-lastTap.x)<30;
-    lastTap=dbl?null:{at:now,x:ev.clientX};
-    freeSeek=true;setFollow(true);P.seek(tAt(ev));
-    if(dbl)clearLoop()}
+  if(!drag)return;clearTimeout(drag.timer);
+  if(drag.what==='a'||drag.what==='b'||(drag.what==='sel'&&drag.moved)){record(drag.mark);save()}
+  else if(!drag.moved&&ev.type==='pointerup')tapAt(ev);
   drag=null;dirty=true};
 canvas.addEventListener('pointerup',endDrag);canvas.addEventListener('pointercancel',endDrag);
+// Wheel and trackpad, like a map: sideways scroll pans (as a drag does); up/down scroll and pinch (ctrlKey) zoom around the cursor.
+canvas.addEventListener('wheel',ev=>{
+  if(!S.dur)return;ev.preventDefault();
+  const r=canvas.getBoundingClientRect(),u=ev.deltaMode===1?16:ev.deltaMode===2?r.width:1,dx=ev.deltaX*u,dy=ev.deltaY*u;
+  if(!ev.ctrlKey&&Math.abs(dx)>Math.abs(dy)){setFollow(null);S.v0+=dx/r.width*vw();range();dirty=true;return}
+  zoomAt(vw()*Math.exp(dy*(ev.ctrlKey?0.01:0.002)),(ev.clientX-r.left)/r.width);
+},{passive:false});
 
 /* ---------- controls ---------- */
 $('play').onclick=togglePlay;$('restart').onclick=()=>{if(S.click)audioCtx();startLoop();lockScreen()};
@@ -340,8 +326,6 @@ $('speed').oninput=e=>setRate(+e.target.value);
 $('aMinus').onclick=()=>setA(nudge(S.a,-1));$('aPlus').onclick=()=>setA(nudge(S.a,1));
 $('bMinus').onclick=()=>setB(nudge(S.b,-1));$('bPlus').onclick=()=>setB(nudge(S.b,1));
 $('aHere').onclick=()=>setA(snap(P.time()));$('bHere').onclick=()=>setB(snap(P.time()));
-$('half').onclick=()=>setOct(-1);$('double').onclick=()=>setOct(1);
-$('oneMinus').onclick=()=>shiftOne(-1);$('onePlus').onclick=()=>shiftOne(1);
 $('tLead').onclick=()=>{S.lead=!S.lead;render();save()};
 $('tRepeat').onclick=()=>{S.repeat=!S.repeat;render();save()};
 $('tClick').onclick=()=>{S.click=!S.click;if(S.click)audioCtx();render();save()};
@@ -354,7 +338,7 @@ $('undo').onclick=undo;
   sv.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();sv.blur()}else if(e.key==='Escape'){cancel=true;sv.blur()}});
   sv.addEventListener('blur',()=>{const n=parseFloat(sv.value);if(!cancel&&isFinite(n))setRate(n);else render()})}
 $('zOut').onclick=()=>zoom(-1);$('zIn').onclick=()=>zoom(1);$('fitLoop').onclick=fitLoop;$('fitSong').onclick=fitSong;
-$('recenter').onclick=()=>setFollow(true);
+$('recenter').onclick=()=>setFollow(FOLLOW);
 document.addEventListener('keydown',e=>{if(e.code==='Space'&&S.dur&&!/INPUT|BUTTON|TEXTAREA/.test(e.target.tagName)){e.preventDefault();togglePlay()}});
 new ResizeObserver(resize).observe($('cwrap'));
 try{matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>dirty=true)}catch(e){}
@@ -363,12 +347,12 @@ new MutationObserver(()=>dirty=true).observe(document.documentElement,{attribute
 /* ---------- shared setup after a source loads ---------- */
 function showApp(){$('empty').hidden=true;$('app').hidden=false;$('transport').hidden=false}
 function restore(key){
-  S.key=key;const saved=store.get(key);S.grid=null;S.oct=0;S.shift=0;S.phase=0;S.zw=0;clearUndo();
-  if(saved){for(const k of ['a','b','rate','lead','snap','repeat','zw','grid','oct','shift','phase'])if(k in saved)S[k]=saved[k]}
+  S.key=key;const saved=store.get(key);S.zw=0;clearUndo();
+  if(saved){for(const k of ['a','b','rate','lead','snap','repeat','zw'])if(k in saved)S[k]=saved[k]}
   else{if(S.dur>=46){S.a=20;S.b=44}else{S.a=0;S.b=Math.min(S.dur||8,8)}}
   if(S.a===null||S.b===null)S.a=S.b=null; // no loop
   else{S.b=Math.min(S.b,S.dur||S.b);S.a=Math.max(0,Math.min(S.a,S.b-0.5))}
-  zwAuto=!(S.zw>0);setFollow(true);
+  zwAuto=!(S.zw>0);setFollow(FOLLOW);
   return !!saved;
 }
 
@@ -379,15 +363,15 @@ async function loadClip(f){
   if(P===Yt&&ytReady)yt.pauseVideo();
   P=Clip;want=false;video.pause();if(objUrl)URL.revokeObjectURL(objUrl);
   $('ytWrap').hidden=true;$('srcNote').textContent='';markSong(null);steps=null;$('speed').step=5;$('rateNote').textContent='';
-  S.peaks=null;S.pdur=0;S.auto=null;S.beats=[];S.bpm=0;S.dur=0;showApp();
+  S.peaks=null;S.pdur=0;S.beats=[];S.bpm=0;S.one=0;S.dur=0;showApp();
   const st=$('status');st.textContent='Loading clip…';
   objUrl=URL.createObjectURL(f);const meta=once(video,'loadedmetadata');video.src=objUrl;video.load();
   await meta;
   const hasVideo=video.videoWidth>0;video.hidden=!hasVideo;$('audioOnly').hidden=hasVideo;
   S.dur=isFinite(video.duration)?video.duration:0;
-  const saved=restore('cl:'+f.name+':'+f.size);useBeats();
+  const saved=restore('cl:'+f.name+':'+f.size);
   applyRate();resize();render();P.seek(pre());
-  if(f.size>450e6){st.textContent='This clip is too large to draw a waveform on a phone. Looping still works; use Tap beat for counts.';S.peaks=new Float32Array(1);render();return}
+  if(f.size>450e6){st.textContent='This clip is too large to draw a waveform on a phone. Looping still works, but there are no counts.';S.peaks=new Float32Array(1);render();return}
   st.textContent='Reading audio for the waveform and beats…';
   await new Promise(r=>setTimeout(r,30));
   try{
@@ -400,10 +384,10 @@ async function loadClip(f){
     st.textContent='Finding the beat…';await new Promise(r=>setTimeout(r,30));
     const res=analyze(mono,audio.sampleRate);
     if(P!==Clip)return;
-    gotAnalysis(res.peaks,audio.duration,res.beats,res.bpm,saved);
-    st.textContent=S.beats.length?'Tap to jump there. Drag A or B; they snap to the beat grid. If the counts look off, try ½× or 2× tempo, move the 1, or use Tap beat.':'Tap to jump there. Drag A or B to move the loop.';
+    gotAnalysis(res.peaks,audio.duration,res.beats,res.bpm,0,saved);
+    st.textContent=S.beats.length?'Tap to jump there. Drag A or B; they snap to the beat grid.':'Tap to jump there. Drag A or B to move the loop.';
     P.seek(pre());
-  }catch(err){S.peaks=new Float32Array(1);st.textContent="Couldn't read this clip's audio, so there's no waveform. Looping, speed and Tap beat still work.";render()}
+  }catch(err){S.peaks=new Float32Array(1);st.textContent="Couldn't read this clip's audio, so there's no waveform. Looping and speed still work.";render()}
 }
 
 /* ---------- YouTube ---------- */
@@ -430,21 +414,21 @@ async function loadYt(id){
   try{await loadApi()}catch(err){note.textContent="YouTube can't load on this page. Open this looper from its own web address, or use Load clip with a screen recording.";return}
   video.pause();P=Yt;ytReady=false;ytState=-1;want=false;seekT=null;pend=null;
   video.hidden=true;$('audioOnly').hidden=true;$('ytWrap').hidden=false;
-  S.peaks=null;S.pdur=0;S.auto=null;S.dur=0;S.beats=[];showApp();
+  S.peaks=null;S.pdur=0;S.dur=0;S.beats=[];S.bpm=0;S.one=0;showApp();
   if(yt){try{yt.destroy()}catch(e){}const h=document.createElement('div');h.id='ytHost';$('ytWrap').replaceChildren(h)}
   const me=yt=new YT.Player('ytHost',{videoId:id,playerVars:{playsinline:1,rel:0,modestbranding:1,controls:1},
     events:{
-      onReady:()=>{ytReady=true;S.dur=yt.getDuration()||0;const saved=restore('cl:yt:'+id);useBeats();probeYtRates();resize();render();P.seek(pre());
-        note.textContent='';$('status').textContent='Press Play. For counts, tap Tap beat along with the music for 8 or so beats, then use Move the 1 to put the 1 on the downbeat.';
+      onReady:()=>{ytReady=true;S.dur=yt.getDuration()||0;const saved=restore('cl:yt:'+id);probeYtRates();resize();render();P.seek(pre());
+        note.textContent='';$('status').textContent='Press Play.';
         ana.then(j=>{if(yt!==me||!j)return;
           if(!S.dur&&j.duration>0)S.dur=j.duration;
-          gotAnalysis(Float32Array.from(j.peaks),+j.duration||S.dur,j.beats.filter(Number.isFinite),+j.bpm||0,saved);
+          gotAnalysis(Float32Array.from(j.peaks),+j.duration||S.dur,j.beats.filter(Number.isFinite),+j.bpm||0,+j.one||0,saved);
           if(P.paused())P.seek(pre());
-          $('status').textContent=S.grid?'Using your tapped beat grid. Tap Use detected to switch to the detected beats.':'Drag A or B; they snap to the beat grid. If the counts look off, try ½× or 2× tempo, move the 1, or use Tap beat.'});
+          $('status').textContent='Drag A or B; they snap to the beat grid.'});
       },
       onStateChange:ev=>{const s=ev.data,now=performance.now();ytState=s;
         if(s===3)bufAt=now;
-        if(s===1){if(!S.dur){S.dur=yt.getDuration()||0;useBeats();render()}applyRate();if(pend!==null){const t=pend;pend=null;Yt.seek(t)}}
+        if(s===1){if(!S.dur){S.dur=yt.getDuration()||0;render()}applyRate();if(pend!==null){const t=pend;pend=null;Yt.seek(t)}}
         if(s===2&&now-seekAt>3000)want=false; // paused from the YouTube player's own controls
         if(s===0&&want){if(S.repeat&&hasLoop())startLoop();else{want=false;Yt.seek(pre())}}
         onPlayState(s===1||s===3);dirty=true},

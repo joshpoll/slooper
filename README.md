@@ -10,19 +10,17 @@ It is built for one dancer practicing on an iPhone in Safari. It is a plain stat
 2. Drag the red A and B markers on the timeline to choose the section to loop. The ‹ and › buttons move a marker by one beat, and **Set to playhead** puts it where the video is now. **Undo** puts the markers back where they were before your last change. Press it again to step further back.
 3. Set the speed and press **Play**. To type a speed, tap the percentage. With the lead-in on, each loop starts 3 seconds before A.
 
-On the timeline, tap to jump there, and drag anywhere away from the markers to scroll it. Double-tap to clear the loop. With no loop, Play just plays the song from the playhead. To make a new loop, tap **Set to playhead** under A or B. That makes a loop about 8 beats long, starting or ending at the playhead, and then you can drag its markers. **Undo** brings back a loop you cleared.
+On the timeline, tap to jump there, and drag anywhere away from the markers to scroll it. To make a new loop, hold a finger still on the timeline for a moment until the A marker appears, then drag to where the loop should end. You can also tap **Set to playhead** under A or B. That makes a loop about 8 beats long, starting or ending at the playhead. Double-tap to clear the loop. With no loop, Play just plays the song from the playhead. **Undo** brings back a loop you cleared or replaced.
 
-The − and + buttons zoom out and in, **Fit loop** shows the whole loop, and **Fit song** shows the whole song. The zoom stays where you put it. Thin lines mark each "1". While the song plays, the timeline scrolls so the playhead stays about a quarter of the way in from the left, like a map app following you. When you scroll the timeline yourself, or tap Fit loop or Fit song, it stops following and shows a **Re-center** button. Tap Re-center, Play, Restart, or a spot on the timeline to follow the playhead again.
+On a computer, click to jump there, and click and drag to make a new loop, like selecting text. Scroll sideways with the trackpad to scroll the timeline. Scroll up and down, or pinch, to zoom in and out around the pointer.
 
-The count strip lights up the current count. The "1" belongs to the song, so it stays on the same beat wherever you put A. The label next to A shows which count A is on. If the counts are off:
+The − and + buttons zoom out and in, **Fit loop** shows the whole loop, and **Fit song** shows the whole song. The zoom stays where you put it. Thin lines mark each "1". While the song plays, the timeline follows the playhead, like a map app following you: the playhead stays at the same spot on the screen and the timeline moves under it. That spot is wherever the playhead was when following started, so after you tap the timeline, the playhead stays where you tapped. When you scroll the timeline yourself, or tap Fit loop or Fit song, it stops following and shows a **Re-center** button. Tap Re-center to put the playhead a quarter of the way in from the left and follow it from there. Play, Restart and tapping the timeline also start following again.
 
-- **½× tempo** and **2× tempo** fix a beat grid that runs at half or double the real speed.
-- **Move the 1** shifts which beat counts as "1" by one beat, for the whole song. Set it once and it stays.
-- **Tap beat** lets you tap along with the music to set your own beat grid. Your tapped grid wins over the detected beats. **Use detected** goes back to the detected beats.
+The count strip lights up the current count. The "1" belongs to the song, so it stays on the same beat wherever you put A. For songs in the list, the beats and which beat is the "1" come from the song's analysis file. For clips, the app finds the beats itself and counts the first beat as "1". The label next to A shows which count A is on.
 
 Other options are **Lead-in click**, which plays a click on each beat of the lead-in, and **Big count**, which makes the count strip large enough to read from across the room. Note that the iPhone silent switch mutes the click.
 
-Slooper remembers the loop points, speed, beat grid and count settings for each video on your phone.
+Slooper remembers the loop points and speed for each video on your phone.
 
 To put it on your home screen, open the site in Safari, tap Share, then tap **Add to Home Screen**. It then opens full screen.
 
@@ -30,7 +28,7 @@ To put it on your home screen, open the site in Safari, tap Share, then tap **Ad
 
 Clips get a waveform and beats right away, because the app reads the audio in the browser.
 
-A web page can't read the audio of a YouTube video. So for YouTube, the waveform and beats come from a file that is made ahead of time on a laptop and committed to this repo. Each song has a file `analysis/<videoId>.json`. The file `analysis/index.json` lists all the songs, and the app shows that list.
+A web page can't read the audio of a YouTube video. So for YouTube, the waveform and beats come from a file that is made ahead of time on a laptop and committed to this repo. Each song has a file `analysis/<videoId>.json`. It holds the waveform, the beat times, and an optional field `one`, the index of a beat that is a "1" (0 if it is missing). A song with no analysis file has no beats, so it has no counts and the markers don't snap. The file `analysis/index.json` lists all the songs, and the app shows that list.
 
 ## Adding a song
 

@@ -40,10 +40,10 @@
     <ol>
       <li>The last song you used opens here by itself. To switch, pick another from the list above, or tap <b>Load clip</b> for a video or audio file (a screen recording works).</li>
       <li>Drag the red A and B markers, set a speed, and press Play.</li>
-      <li>Songs in the list come with a waveform and beats, and so do clips. If the counts are off, tap <b>Tap beat</b> along with the music to lay down the eight-count.</li>
+      <li>Songs in the list come with a waveform and beats, and so do clips.</li>
     </ol>
     <p>To add a song to the list, run <code>uv run tools/analyze.py</code> with its YouTube link on the laptop, then commit and push. The song shows up here once the site updates.</p>
-    <p>Loop points, speed and beat grid are remembered for each video.</p>
+    <p>Loop points and speed are remembered for each video.</p>
   </section>
 
   <section id="app" hidden>
@@ -64,25 +64,10 @@
           <button id="fitLoop" title="Show the whole loop">Fit loop</button>
           <button id="fitSong" title="Show the whole song">Fit song</button>
         </div>
-        <div style="display:flex;gap:8px;align-items:center">
-          <span id="bpm" class="meta"></span>
-          <button id="tap" class="tapbtn" aria-pressed="false">Tap beat</button>
-          <button id="tapClear" hidden>Clear</button>
-        </div>
+        <span id="bpm" class="meta"></span>
       </div>
-      <div class="canvas-wrap" id="cwrap"><canvas id="wave" aria-label="Timeline. Tap to seek, drag to scroll, drag A or B to move the loop, double-tap to clear the loop."></canvas><button id="recenter" class="recenter" hidden>Re-center</button></div>
-      <div id="gridTools" class="gridtools" hidden>
-        <div class="seg" role="group" aria-label="Tempo">
-          <button id="half" title="Halve the tempo">½× tempo</button>
-          <button id="double" title="Double the tempo">2× tempo</button>
-        </div>
-        <div class="shift">
-          <span class="label">Move the 1</span>
-          <button id="oneMinus" aria-label="Move the 1 one beat earlier, for the whole song">‹</button>
-          <button id="onePlus" aria-label="Move the 1 one beat later, for the whole song">›</button>
-        </div>
-      </div>
-      <div id="status" class="status">Tap the timeline to jump there. Drag it to scroll. Drag A or B to move the loop. Double-tap to clear the loop.</div>
+      <div class="canvas-wrap" id="cwrap"><canvas id="wave" aria-label="Timeline. Tap to seek, drag to scroll, hold then drag to make a loop, drag A or B to move the loop, double-tap to clear the loop."></canvas><button id="recenter" class="recenter" hidden>Re-center</button></div>
+      <div id="status" class="status">Tap the timeline to jump there. Drag it to scroll, or hold and then drag to make a loop. Drag A or B to move the loop. Double-tap to clear the loop.</div>
     </div>
 
     <div class="panel">

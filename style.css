@@ -55,7 +55,7 @@ main{display:grid;gap:14px;padding-block:4px 120px}
 .meta{font-variant-numeric:tabular-nums;color:var(--muted);font-size:13px}
 .canvas-wrap{position:relative;touch-action:none}
 .recenter{position:absolute;right:6px;bottom:6px;min-height:32px;padding:4px 12px;font-size:13px;font-weight:700;background:var(--fg);color:var(--bg);border-color:var(--fg);box-shadow:0 2px 8px rgba(0,0,0,.5)}
-canvas{display:block;width:100%;height:136px;border-radius:8px;background:var(--bg)}
+canvas{display:block;width:100%;height:136px;border-radius:8px;background:var(--bg);cursor:text;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
 .status{font-size:13px;color:var(--muted);margin-top:8px}
 
 /* eight-count strip */
@@ -106,11 +106,10 @@ input[type=range]{width:100%;accent-color:var(--tape);height:32px;margin:10px 0 
 @media (max-width:420px){.time{font-size:34px}.speed-val{font-size:48px}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 
-/* sources + YouTube + tap tempo */
+/* sources + YouTube */
 .yt{width:100%;aspect-ratio:16/9;max-height:42vh}
 .yt iframe,.yt>div{width:100%;height:100%;display:block;border:0}
 .note{font-size:13px;color:var(--muted);margin-top:6px;min-height:1.2em}
-.tapbtn[aria-pressed="true"]{border-color:var(--tape)}
 /* song list (analysis/index.json) */
 .songs summary{display:flex;align-items:center;gap:10px;min-height:44px;cursor:pointer;list-style:none;-webkit-tap-highlight-color:transparent}
 .songs summary::-webkit-details-marker{display:none}
@@ -125,9 +124,3 @@ input[type=range]{width:100%;accent-color:var(--tape);height:32px;margin:10px 0 
 #srcNote:empty{display:none}
 .empty code{font-size:13px;color:var(--fg)}
 .empty .or{font-size:13px;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;font-weight:700}
-
-/* beat-grid tools */
-.gridtools{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:10px}
-.gridtools .seg button{color:var(--fg)}
-.shift{display:flex;align-items:center;gap:6px}
-.shift button{min-width:48px;padding:6px 0;font-size:18px;min-height:36px}
