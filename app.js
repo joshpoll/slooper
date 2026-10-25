@@ -1,13 +1,13 @@
 (function(){
 const $=s=>document.getElementById(s);
-const video=$('vid'), canvas=$('wave'), ctx=canvas.getContext('2d');
+const canvas=$('wave'), ctx=canvas.getContext('2d');
 const LEAD=3; // real seconds of lead-in
 // a,b: the loop, or both null when there is no loop (then playback runs straight through).
 // zw: timeline view width in seconds (0 = not set yet), v0: view start.
-// beats, bpm: the beat grid, from analysis/<id>.json for YouTube or the in-browser detection for clips (empty = no grid).
-// one: index in beats of a beat that is a "1". It belongs to the song (from the analysis file; 0 for clips), not to A.
+// beats, bpm: the beat grid, from analysis/<id>.json (empty = no grid).
+// one: index in beats of a beat that is a "1". It belongs to the song (from the analysis file), not to A.
 const S={a:20,b:44,rate:100,lead:true,snap:true,repeat:true,click:false,big:false,zw:0,v0:0,dur:0,peaks:null,pdur:0,beats:[],bpm:0,one:0,key:null};
-let objUrl=null, dirty=true, drag=null, hoverX=null, wake=null, want=false;
+let dirty=true, drag=null, hoverX=null, wake=null, want=false;
 
 const store={get(k){try{return JSON.parse(localStorage.getItem(k))}catch(e){return null}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
 const PREFS=['rate','lead','snap','repeat','click','big'];
@@ -18,15 +18,12 @@ const fmt=t=>{if(!isFinite(t))t=0;t=Math.max(0,t);const m=Math.floor(t/60),s=t-m
 const hasLoop=()=>S.a!==null;
 const pre=()=>hasLoop()?Math.max(0,S.a-(S.lead?LEAD*S.rate/100:0)):0; // where a round starts: the lead-in before A, or the song's start with no loop
 
-/* ---------- players: clip file or YouTube ---------- */
+/* ---------- YouTube player ---------- */
 let yt=null, ytState=-1, ytReady=false, apiPromise=null, ytRates=[];
 // YouTube seek guard: getCurrentTime can lag behind a seekTo, so until the time lands near the target (or 2 s pass) we report the target.
 // pend holds a seek asked for before the video has ever played; it runs on the first "playing" state (iOS ignores seeks before that).
 let seekT=null, seekAt=0, pend=null, kickAt=0, bufAt=0;
-const Clip={kind:'clip',
-  time:()=>video.currentTime||0, seek:t=>{video.currentTime=t}, play:()=>{video.play().catch(()=>{})}, pause:()=>video.pause(), paused:()=>video.paused, settled:()=>!video.seeking,
-  setRate(r){try{video.defaultPlaybackRate=r;video.playbackRate=r;video.preservesPitch=true;video.webkitPreservesPitch=true}catch(e){}}};
-const Yt={kind:'yt',
+const Yt={
   time(){if(!ytReady||!yt.getCurrentTime)return 0;if(pend!==null)return pend;const c=yt.getCurrentTime()||0;
     if(seekT!==null){const el=(performance.now()-seekAt)/1000;if(el>2||(c>=seekT-0.25&&c<=seekT+0.25+el*S.rate/100))seekT=null;else return seekT}
     return c},
@@ -34,23 +31,19 @@ const Yt={kind:'yt',
   play:()=>{if(ytReady)yt.playVideo()}, pause:()=>{if(ytReady)yt.pauseVideo()},
   paused:()=>!(ytState===1||ytState===3), settled:()=>ytState===1&&seekT===null&&pend===null,
   setRate(r){if(!ytReady)return;try{yt.setPlaybackRate(r)}catch(e){}setTimeout(checkYtRate,400)}};
-let P=Clip;
-function checkYtRate(){if(P!==Yt||!ytReady)return;const want=S.rate,got=Math.round(yt.getPlaybackRate()*100);
+function checkYtRate(){if(!ytReady)return;const want=S.rate,got=Math.round(yt.getPlaybackRate()*100);
   if(got===want){if(!steps)$('rateNote').textContent='';return}
   // the player quietly refused a 5% step: fall back to the speeds it lists
   if(!steps&&ytRates.length&&!ytRates.includes(want)){setSteps(ytRates);return}
   $('rateNote').textContent='YouTube is playing at '+got+'% instead of '+want+'%.'}
-function applyRate(){P.setRate(S.rate/100)}
+function applyRate(){Yt.setRate(S.rate/100)}
 function onPlayState(playing){$('play').textContent=playing?'Pause':'Play';if(!playing){$('count').hidden=true;stopClicks();if(wake){wake.release().catch(()=>{});wake=null}}}
-video.addEventListener('play',()=>{if(P===Clip){onPlayState(true);applyRate()}});
-video.addEventListener('pause',()=>{if(P===Clip)onPlayState(false)});
-video.addEventListener('seeked',()=>dirty=true);
 
 /* ---------- speed steps ---------- */
-let steps=null; // YouTube only: the speeds (percent, 50–150) the player allows when it can't do 5% steps
+let steps=null; // the speeds (percent, 50–150) the player allows when it can't do 5% steps
 function setSteps(list){
   steps=list&&list.length?list:null;$('speed').step=steps?25:5;
-  $('rateNote').textContent=steps?'YouTube only allows '+steps.join(', ')+'% here. Load a clip for 5% steps.':'';
+  $('rateNote').textContent=steps?'YouTube only allows '+steps.join(', ')+'% here.':'';
   setRate(S.rate);
 }
 function setRate(r){r=Math.max(50,Math.min(150,r));S.rate=steps?steps.reduce((x,y)=>Math.abs(y-r)<Math.abs(x-r)?y:x):Math.round(r/5)*5;applyRate();render();save()}
@@ -82,35 +75,12 @@ function setB(t){const m=mark();if(!hasLoop())S.a=Math.max(0,snap(t-loopLen()));
 function clearLoop(){if(!hasLoop())return;const m=mark();S.a=S.b=null;record(m);render();save();
   $('status').textContent='Loop cleared. Play runs straight through. Set A or B to the playhead to make a new loop, or tap Undo to get this one back.'}
 function snapAB(){if(!useSnap()||!hasLoop())return;const m=mark();S.a=snap(S.a);S.b=Math.max(snap(S.b),S.a+0.5);record(m)}
-// New waveform and detected beats, from clip analysis or a fetched analysis file.
+// New waveform and beats, from a fetched analysis file.
 function gotAnalysis(peaks,pdur,beats,bpm,one,saved){
   S.peaks=peaks;S.pdur=pdur;S.beats=beats;S.bpm=beats.length?bpm:0;S.one=Math.max(0,one|0);
   if(!saved){snapAB();clearUndo()} // snapping the default loop on load is not a change to undo
   if(zwAuto)S.zw=defW(); // default zoom: about 10 eight-counts, now that the beat is known
   render();
-}
-function analyze(mono,sr){
-  const N=Math.min(8000,Math.max(500,(mono.length/64)|0)), bs=mono.length/N, peaks=new Float32Array(N);let mx=1e-6;
-  for(let i=0;i<N;i++){let m=0;const s=(i*bs)|0,e=Math.min(mono.length,((i+1)*bs)|0);for(let j=s;j<e;j+=2){const v=Math.abs(mono[j]);if(v>m)m=v}peaks[i]=m;if(m>mx)mx=m}
-  for(let i=0;i<N;i++)peaks[i]/=mx;
-  const hop=512,win=1024,n=Math.max(0,Math.floor((mono.length-win)/hop)),fr=sr/hop;
-  if(n<fr*4) return {peaks,beats:[],bpm:0};
-  const e=new Float32Array(n);for(let f=0;f<n;f++){let s=0;const o=f*hop;for(let i=0;i<win;i+=2){const v=mono[o+i];s+=v*v}e[f]=Math.log(1e-8+s)}
-  const raw=new Float32Array(n);for(let f=1;f<n;f++){const d=e[f]-e[f-1];raw[f]=d>0?d:0}
-  const ps=new Float64Array(n+1);for(let i=0;i<n;i++)ps[i+1]=ps[i]+raw[i];
-  const w=Math.round(fr*0.4), on=new Float32Array(n);let sum=0,sq=0;
-  for(let f=0;f<n;f++){const lo=Math.max(0,f-w),hi=Math.min(n,f+w+1);const v=Math.max(0,raw[f]-(ps[hi]-ps[lo])/(hi-lo));on[f]=v;sum+=v;sq+=v*v}
-  const sd=Math.sqrt(Math.max(1e-12,sq/n-(sum/n)**2));for(let f=0;f<n;f++)on[f]/=sd;
-  const Lmin=Math.floor(fr*60/200),Lmax=Math.ceil(fr*60/60),sc=new Float64Array(Lmax+2);
-  for(let L=Lmin;L<=Lmax;L++){let s=0;for(let i=0;i+L<n;i++)s+=on[i]*on[i+L];const bpm=60*fr/L;sc[L]=s/(n-L)*Math.exp(-0.5*(Math.log2(bpm/120)/0.9)**2)}
-  let bL=Lmin;for(let L=Lmin;L<=Lmax;L++)if(sc[L]>sc[bL])bL=L;
-  let Pd=bL;if(bL>Lmin&&bL<Lmax){const y0=sc[bL-1],y1=sc[bL],y2=sc[bL+1],den=y0-2*y1+y2;if(den!==0)Pd=bL+0.5*(y0-y2)/den}
-  const tight=100,score=new Float32Array(n),back=new Int32Array(n).fill(-1),far=Math.round(2*Pd),near=Math.max(1,Math.round(Pd/2));
-  for(let t=0;t<n;t++){let best=-Infinity,bi=-1;for(let p=Math.max(0,t-far);p<=t-near;p++){const l=Math.log((t-p)/Pd),v=score[p]-tight*l*l;if(v>best){best=v;bi=p}}
-    if(bi>=0&&best>0){score[t]=on[t]+best;back[t]=bi}else score[t]=on[t]}
-  let t=n-1;for(let i=Math.max(0,n-far);i<n;i++)if(score[i]>score[t])t=i;
-  const fr2=[];while(t>=0){fr2.push(t);t=back[t]}fr2.reverse();
-  return {peaks,beats:fr2.map(f=>(f*hop+win/2)/sr),bpm:60*fr/Pd};
 }
 
 /* ---------- lead-in click ---------- */
@@ -140,7 +110,7 @@ const defW=()=>80*beatLen();
 const FOLLOW=0.25;
 let zwAuto=true, followAt=FOLLOW;
 function setFollow(at){followAt=at;$('recenter').hidden=at!==null;dirty=true}
-const headFrac=()=>{const [v0,v1]=range();return (P.time()-v0)/(v1-v0)};
+const headFrac=()=>{const [v0,v1]=range();return (Yt.time()-v0)/(v1-v0)};
 const onScreen=f=>f>=0&&f<=1;
 // Play and Restart: keep following, or start from the playhead's screen spot (FOLLOW if it is off screen).
 function followHere(){if(followAt===null){const f=headFrac();setFollow(onScreen(f)?f:FOLLOW)}}
@@ -192,12 +162,11 @@ function draw(){
   if(S.peaks&&S.peaks.length>1){const Pk=S.peaks,N=Pk.length,dur=S.pdur||S.dur||1,cw=tok(cs,'--wave'),ci=tok(cs,'--wave-in');
     for(let x=0;x<W;x+=2){const t0=v0+x/W*span,t1=v0+(x+2)/W*span;let i0=Math.floor(t0/dur*N),i1=Math.max(i0+1,Math.floor(t1/dur*N));let m=0;for(let i=Math.max(0,i0);i<Math.min(N,i1);i++)if(Pk[i]>m)m=Pk[i];
       const h=Math.max(1,m*amp),t=(t0+t1)/2;ctx.fillStyle=(loop&&t>=S.a&&t<=S.b)?ci:cw;ctx.fillRect(x,mid-h,1.5,2*h)}}
-  else{ctx.fillStyle=tok(cs,'--line');ctx.fillRect(0,mid,W,1);
-    if(P===Clip&&!S.peaks){ctx.fillStyle=tok(cs,'--muted');ctx.font='13px '+tok(cs,'--body');ctx.textAlign='center';ctx.fillText('Reading audio…',W/2,mid-8)}}
+  else{ctx.fillStyle=tok(cs,'--line');ctx.fillRect(0,mid,W,1)}
   if(loop){ctx.fillStyle=tok(cs,'--tape');ctx.fillRect(Math.round(xa)-1,0,2,H);ctx.fillRect(Math.round(xb)-1,0,2,H);
     ctx.fillStyle=tok(cs,'--tape-fill');ctx.fillRect(xa-1,0,20,18);ctx.fillRect(xb-19,0,20,18);
     ctx.fillStyle=tok(cs,'--tape-ink');ctx.font='700 12px '+tok(cs,'--body');ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('A',xa+9,9.5);ctx.fillText('B',xb-9,9.5);ctx.textBaseline='alphabetic'}
-  ctx.fillStyle=tok(cs,'--head');ctx.fillRect(Math.round(X(P.time()))-1,top-4,2,H-top+4);
+  ctx.fillStyle=tok(cs,'--head');ctx.fillRect(Math.round(X(Yt.time()))-1,top-4,2,H-top+4);
   // mouse hover: the time a click would seek to, like YouTube's progress bar
   if(hoverX!==null){const x=Math.round(hoverX),lab=mss(Math.max(0,Math.floor(v0+hoverX/W*span)));ctx.font='700 11px '+tok(cs,'--body');
     const w=ctx.measureText(lab).width+10,bx=Math.max(0,Math.min(W-w,x-w/2));
@@ -223,14 +192,14 @@ function render(){
 }
 
 async function lockScreen(){try{if('wakeLock'in navigator&&!wake){wake=await navigator.wakeLock.request('screen');wake.addEventListener('release',()=>wake=null)}}catch(e){}}
-function startLoop(){followHere();want=true;clickArm=true;P.seek(pre());applyRate();P.play()}
+function startLoop(){followHere();want=true;clickArm=true;Yt.seek(pre());applyRate();Yt.play()}
 function togglePlay(){
   if(S.click)audioCtx(); // unlock Web Audio inside the tap
-  if(!P.paused()){want=false;P.pause();return}
-  const t=P.time();want=true;clickArm=true;followHere();
-  if(hasLoop()&&(t<pre()-0.25||t>=S.b-0.05))startLoop();else{applyRate();P.play()}
+  if(!Yt.paused()){want=false;Yt.pause();return}
+  const t=Yt.time();want=true;clickArm=true;followHere();
+  if(hasLoop()&&(t<pre()-0.25||t>=S.b-0.05))startLoop();else{applyRate();Yt.play()}
   lockScreen();
-  if(P===Yt)setTimeout(()=>{if(P===Yt&&want&&P.paused())$('status').textContent="If the video doesn't start, tap the video itself once. After that, Play works from here."},2500);
+  setTimeout(()=>{if(want&&Yt.paused())$('status').textContent="If the video doesn't start, tap the video itself once. After that, Play works from here."},2500);
 }
 
 /* ---------- eight-count strip ---------- */
@@ -253,7 +222,7 @@ function updateCounter(t){
 
 // YouTube on iOS can drop to paused right after a seek, or sit buffering. Nudge it while the user wants playback.
 function ytWatch(now){
-  if(P!==Yt||!ytReady||!want||now-kickAt<1500)return;
+  if(!ytReady||!want||now-kickAt<1500)return;
   if(ytState===2&&now-seekAt<3000){kickAt=now;yt.playVideo()}
   else if(ytState===3&&now-bufAt>6000){kickAt=now;bufAt=now;Yt.seek(yt.getCurrentTime());yt.playVideo()}
 }
@@ -261,9 +230,9 @@ function ytWatch(now){
 function tick(){
   requestAnimationFrame(tick);
   if(!S.dur)return;
-  const t=P.time(),playing=!P.paused();
-  if(playing&&hasLoop()&&t>=S.b){clickArm=true;if(S.repeat)P.seek(pre());else{want=false;P.pause();P.seek(pre())}}
-  else if(clickArm&&playing&&P.settled()){if(S.click&&S.lead&&hasLoop()&&t<S.a&&t>=pre()-0.3)scheduleClicks(t);clickArm=false}
+  const t=Yt.time(),playing=!Yt.paused();
+  if(playing&&hasLoop()&&t>=S.b){clickArm=true;if(S.repeat)Yt.seek(pre());else{want=false;Yt.pause();Yt.seek(pre())}}
+  else if(clickArm&&playing&&Yt.settled()){if(S.click&&S.lead&&hasLoop()&&t<S.a&&t>=pre()-0.3)scheduleClicks(t);clickArm=false}
   ytWatch(performance.now());
   updateCounter(t);
   followHead(t);
@@ -288,7 +257,7 @@ function selectTo(t0,t){const D=S.dur;let a=snap(Math.min(t0,t)),b=snap(Math.max
 let lastTap=null; // {at, x} of the previous tap
 function tapAt(ev){const r=canvas.getBoundingClientRect(),now=performance.now(),dbl=lastTap&&now-lastTap.at<300&&Math.abs(ev.clientX-lastTap.x)<30;
   lastTap=dbl?null:{at:now,x:ev.clientX};
-  setFollow(Math.max(0,Math.min(1,(ev.clientX-r.left)/r.width)));P.seek(tAt(ev));
+  setFollow(Math.max(0,Math.min(1,(ev.clientX-r.left)/r.width)));Yt.seek(tAt(ev));
   if(dbl)clearLoop()}
 // A press on the A or B tab drags that marker (one undo entry per drag). Any other press is a tap, unless it moves:
 // - Mouse or pen: dragging 4 px selects a new loop, like selecting text. Desktop pans with the wheel or trackpad instead.
@@ -327,12 +296,13 @@ canvas.addEventListener('wheel',ev=>{
 },{passive:false});
 
 /* ---------- controls ---------- */
-$('play').onclick=togglePlay;$('restart').onclick=()=>{if(S.click)audioCtx();startLoop();lockScreen()};
+function restart(){if(S.click)audioCtx();startLoop();lockScreen()}
+$('play').onclick=togglePlay;$('restart').onclick=restart;
 $('slower').onclick=()=>stepRate(-1);$('faster').onclick=()=>stepRate(1);
 $('speed').oninput=e=>setRate(+e.target.value);
 $('aMinus').onclick=()=>setA(nudge(S.a,-1));$('aPlus').onclick=()=>setA(nudge(S.a,1));
 $('bMinus').onclick=()=>setB(nudge(S.b,-1));$('bPlus').onclick=()=>setB(nudge(S.b,1));
-$('aHere').onclick=()=>setA(snap(P.time()));$('bHere').onclick=()=>setB(snap(P.time()));
+$('aHere').onclick=()=>setA(snap(Yt.time()));$('bHere').onclick=()=>setB(snap(Yt.time()));
 $('tLead').onclick=()=>{S.lead=!S.lead;render();save()};
 $('tRepeat').onclick=()=>{S.repeat=!S.repeat;render();save()};
 $('tClick').onclick=()=>{S.click=!S.click;if(S.click)audioCtx();render();save()};
@@ -346,7 +316,11 @@ $('undo').onclick=undo;
   sv.addEventListener('blur',()=>{const n=parseFloat(sv.value);if(!cancel&&isFinite(n))setRate(n);else render()})}
 $('zOut').onclick=()=>zoom(-1);$('zIn').onclick=()=>zoom(1);$('fitLoop').onclick=fitLoop;$('fitSong').onclick=fitSong;
 $('recenter').onclick=()=>setFollow(FOLLOW);
-document.addEventListener('keydown',e=>{if(e.code==='Space'&&S.dur&&!/INPUT|BUTTON|TEXTAREA/.test(e.target.tagName)){e.preventDefault();togglePlay()}});
+// Space plays and pauses. A second Space within 300 ms, with a loop, restarts from the loop start instead.
+let lastSpace=0;
+document.addEventListener('keydown',e=>{if(e.code!=='Space'||!S.dur||/INPUT|BUTTON|TEXTAREA|SELECT/.test(e.target.tagName))return;
+  e.preventDefault();if(e.repeat)return;const now=performance.now();
+  if(hasLoop()&&now-lastSpace<300){lastSpace=0;restart()}else{lastSpace=now;togglePlay()}});
 new ResizeObserver(resize).observe($('cwrap'));
 try{matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>dirty=true)}catch(e){}
 new MutationObserver(()=>dirty=true).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
@@ -361,40 +335,6 @@ function restore(key){
   else{S.b=Math.min(S.b,S.dur||S.b);S.a=Math.max(0,Math.min(S.a,S.b-0.5))}
   zwAuto=!(S.zw>0);setFollow(FOLLOW);
   return !!saved;
-}
-
-/* ---------- clip files ---------- */
-const once=(el,ev)=>new Promise(r=>el.addEventListener(ev,r,{once:true}));
-$('file').addEventListener('change',e=>{const f=e.target.files&&e.target.files[0];if(f)loadClip(f);e.target.value=''});
-async function loadClip(f){
-  if(P===Yt&&ytReady)yt.pauseVideo();
-  P=Clip;want=false;video.pause();if(objUrl)URL.revokeObjectURL(objUrl);
-  $('ytWrap').hidden=true;$('srcNote').textContent='';markSong(null);steps=null;$('speed').step=5;$('rateNote').textContent='';
-  S.peaks=null;S.pdur=0;S.beats=[];S.bpm=0;S.one=0;S.dur=0;showApp();
-  const st=$('status');st.textContent='Loading clip…';
-  objUrl=URL.createObjectURL(f);const meta=once(video,'loadedmetadata');video.src=objUrl;video.load();
-  await meta;
-  const hasVideo=video.videoWidth>0;video.hidden=!hasVideo;$('audioOnly').hidden=hasVideo;
-  S.dur=isFinite(video.duration)?video.duration:0;
-  const saved=restore('cl:'+f.name+':'+f.size);
-  applyRate();resize();render();P.seek(pre());
-  if(f.size>450e6){st.textContent='This clip is too large to draw a waveform on a phone. Looping still works, but there are no counts.';S.peaks=new Float32Array(1);render();return}
-  st.textContent='Reading audio for the waveform and beats…';
-  await new Promise(r=>setTimeout(r,30));
-  try{
-    const buf=await f.arrayBuffer();const AC=window.AudioContext||window.webkitAudioContext;const ac=new AC();
-    const audio=await new Promise((res,rej)=>{const p=ac.decodeAudioData(buf,res,rej);if(p&&p.then)p.then(res,rej)});
-    try{ac.close()}catch(e){}
-    if(!S.dur)S.dur=audio.duration;
-    const ch=audio.numberOfChannels,L=audio.length,mono=new Float32Array(L);
-    for(let c=0;c<ch;c++){const d=audio.getChannelData(c);for(let i=0;i<L;i++)mono[i]+=d[i]/ch}
-    st.textContent='Finding the beat…';await new Promise(r=>setTimeout(r,30));
-    const res=analyze(mono,audio.sampleRate);
-    if(P!==Clip)return;
-    gotAnalysis(res.peaks,audio.duration,res.beats,res.bpm,0,saved);
-    st.textContent=S.beats.length?'Tap to jump there. Drag A or B; they snap to the beat grid.':'Tap to jump there. Drag A or B to move the loop.';
-    P.seek(pre());
-  }catch(err){S.peaks=new Float32Array(1);st.textContent="Couldn't read this clip's audio, so there's no waveform. Looping and speed still work.";render()}
 }
 
 /* ---------- YouTube ---------- */
@@ -415,22 +355,21 @@ function fetchAnalysis(id){
 }
 const YT_ERR={2:"That link has a bad video ID.",5:"YouTube's player hit an error on this device.",100:'This video is private, removed, or not available.',101:"This video's owner doesn't allow it to play on other sites.",150:"This video's owner doesn't allow it to play on other sites."};
 async function loadYt(id){
-  const note=$('srcNote');store.set('cl:lastSong',id);markSong(id);
+  const note=$('srcNote');store.set('cl:lastSong',id);pick.value=id;
   note.textContent='Loading YouTube…';
   const ana=fetchAnalysis(id);
-  try{await loadApi()}catch(err){note.textContent="YouTube can't load on this page. Open this looper from its own web address, or use Load clip with a screen recording.";return}
-  video.pause();P=Yt;ytReady=false;ytState=-1;want=false;seekT=null;pend=null;
-  video.hidden=true;$('audioOnly').hidden=true;$('ytWrap').hidden=false;
+  try{await loadApi()}catch(err){note.textContent="YouTube can't load on this page. Open Slooper from its web address, not as a file.";return}
+  ytReady=false;ytState=-1;want=false;seekT=null;pend=null;
   S.peaks=null;S.pdur=0;S.dur=0;S.beats=[];S.bpm=0;S.one=0;showApp();
   if(yt){try{yt.destroy()}catch(e){}const h=document.createElement('div');h.id='ytHost';$('ytWrap').replaceChildren(h)}
   const me=yt=new YT.Player('ytHost',{videoId:id,playerVars:{playsinline:1,rel:0,modestbranding:1,controls:1},
     events:{
-      onReady:()=>{ytReady=true;S.dur=yt.getDuration()||0;const saved=restore('cl:yt:'+id);probeYtRates();resize();render();P.seek(pre());
+      onReady:()=>{ytReady=true;S.dur=yt.getDuration()||0;const saved=restore('cl:yt:'+id);probeYtRates();resize();render();Yt.seek(pre());
         note.textContent='';$('status').textContent='Press Play.';
         ana.then(j=>{if(yt!==me||!j)return;
           if(!S.dur&&j.duration>0)S.dur=j.duration;
           gotAnalysis(Float32Array.from(j.peaks),+j.duration||S.dur,j.beats.filter(Number.isFinite),+j.bpm||0,+j.one||0,saved);
-          if(P.paused())P.seek(pre());
+          if(Yt.paused())Yt.seek(pre());
           $('status').textContent='Drag A or B; they snap to the beat grid.'});
       },
       onStateChange:ev=>{const s=ev.data,now=performance.now();ytState=s;
@@ -440,28 +379,20 @@ async function loadYt(id){
         if(s===0&&want){if(S.repeat&&hasLoop())startLoop();else{want=false;Yt.seek(pre())}}
         onPlayState(s===1||s===3);dirty=true},
       onPlaybackRateChange:()=>checkYtRate(),
-      onError:ev=>{const m=(YT_ERR[ev.data]||'YouTube could not play this video (error '+ev.data+').')+' Use Load clip with a screen recording of it instead.';
+      onError:ev=>{const m=YT_ERR[ev.data]||'YouTube could not play this video (error '+ev.data+').';
         note.textContent=m;$('status').textContent=m;want=false}
     }});
 }
 
-/* ---------- song list: analysis/index.json, written by tools/analyze.py ---------- */
-let songs=[];
-const fmtDur=t=>{t=Math.round(t)||0;return Math.floor(t/60)+':'+String(t%60).padStart(2,'0')};
-// Highlight the song that is loaded (null for a clip) and fold the list away; its summary row opens it again.
-function markSong(id){
-  for(const b of $('songs').children)b.classList.toggle('on',b.dataset.id===id);
-  const s=songs.find(x=>x.id===id);$('songNow').textContent=s?s.title:'';$('songBox').open=false;
-}
+/* ---------- song picker: analysis/index.json, written by tools/analyze.py ---------- */
+const pick=$('song');
+pick.onchange=()=>loadYt(pick.value);
 fetch('analysis/index.json',{cache:'no-cache'}).then(r=>r.ok?r.json():null).then(list=>{
-  songs=(Array.isArray(list)?list:[]).filter(x=>x&&/^[\w-]{11}$/.test(x.id));
+  const songs=(Array.isArray(list)?list:[]).filter(x=>x&&/^[\w-]{11}$/.test(x.id));
   if(!songs.length)throw new Error('empty');
-  const last=store.get('cl:lastSong'),i=songs.findIndex(x=>x.id===last);
-  if(i>0)songs.unshift(...songs.splice(i,1)); // the last song first
-  $('songs').replaceChildren(...songs.map(x=>{const b=document.createElement('button');b.className='song';b.dataset.id=x.id;
-    b.innerHTML='<span></span><span class="dur"></span>';b.firstChild.textContent=x.title||x.id;b.lastChild.textContent=fmtDur(x.duration);
-    b.onclick=()=>loadYt(x.id);return b}));
-  loadYt(songs[0].id); // open the last song (or the first) right away; Play still needs a tap
-}).catch(()=>{$('songBox').hidden=true;$('srcNote').textContent="The song list didn't load. Tap Load clip to open a video or audio file."});
+  pick.replaceChildren(...songs.map(x=>new Option(x.title||x.id,x.id)));pick.hidden=false;
+  const last=store.get('cl:lastSong');
+  loadYt(songs.some(x=>x.id===last)?last:songs[0].id); // open the last song (or the first) right away; Play still needs a tap
+}).catch(()=>{$('srcNote').textContent="The song list didn't load. Check your connection, then reload the page."});
 requestAnimationFrame(tick);
 })();

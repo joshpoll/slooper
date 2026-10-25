@@ -21,12 +21,15 @@ header{padding-top:env(safe-area-inset-top,0px)}
   font:700 9px/13px var(--body);color:var(--tape-ink);text-align:center;
   background:radial-gradient(circle at 6.5px 6.5px,var(--tape) 6px,transparent 6.5px),linear-gradient(var(--tape),var(--tape)) 50% 10px/2px 100% no-repeat}
 .brand i::before{content:"A";left:-6.5px}.brand i::after{content:"B";right:-6.5px}
-.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 
-button,.btn{font:inherit;color:var(--fg);background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 14px;cursor:pointer;-webkit-tap-highlight-color:transparent;display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:44px}
-button:active,.btn:active{transform:translateY(1px)}
-button:focus-visible,.btn:focus-visible,input:focus-visible{outline:2px solid var(--tape);outline-offset:2px}
-.btn.solid{background:var(--tape-fill);color:var(--tape-ink);border-color:var(--tape-fill);font-weight:700}
+button,.picker{font:inherit;color:var(--fg);background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 14px;cursor:pointer;-webkit-tap-highlight-color:transparent;display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:44px}
+button:active{transform:translateY(1px)}
+button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--tape);outline-offset:2px}
+/* song picker: a native select (the system picker on iPhone), truncated with an ellipsis when the title is long */
+.picker{display:block;flex:0 1 auto;min-width:0;max-width:62%;font-weight:700;text-overflow:ellipsis;white-space:nowrap;overflow:hidden;
+  -webkit-appearance:none;appearance:none;padding-right:34px;
+  background:var(--surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%239b9092' stroke-width='2'/%3E%3C/svg%3E") no-repeat right 13px center}
+.brand{flex:none}
 
 main{display:grid;gap:14px;padding-block:4px 120px}
 .panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px}
@@ -42,9 +45,7 @@ main{display:grid;gap:14px;padding-block:4px 120px}
 
 /* stage */
 .stage{position:relative;background:var(--stage);border-radius:14px;overflow:hidden;display:grid;place-items:center;min-height:96px}
-.stage video{display:block;width:100%;max-height:40vh;object-fit:contain}
 .count{position:absolute;inset:0;display:grid;place-items:center;font-family:var(--display);font-weight:700;font-size:min(30vw,160px);color:var(--stage-fg);text-shadow:0 2px 24px rgba(0,0,0,.6);pointer-events:none}
-.audio-only{color:var(--stage-fg);font-family:var(--display);font-size:20px;letter-spacing:.06em;text-transform:uppercase;opacity:.7}
 
 /* waveform */
 .wave-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px}
@@ -106,21 +107,9 @@ input[type=range]{width:100%;accent-color:var(--tape);height:32px;margin:10px 0 
 @media (max-width:420px){.time{font-size:34px}.speed-val{font-size:48px}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 
-/* sources + YouTube */
+/* YouTube */
 .yt{width:100%;aspect-ratio:16/9;max-height:42vh}
 .yt iframe,.yt>div{width:100%;height:100%;display:block;border:0}
 .note{font-size:13px;color:var(--muted);margin-top:6px;min-height:1.2em}
-/* song list (analysis/index.json) */
-.songs summary{display:flex;align-items:center;gap:10px;min-height:44px;cursor:pointer;list-style:none;-webkit-tap-highlight-color:transparent}
-.songs summary::-webkit-details-marker{display:none}
-.songs summary::after{content:"";margin-left:auto;width:8px;height:8px;border:solid var(--muted);border-width:0 2px 2px 0;transform:rotate(45deg);flex:none}
-.songs[open] summary::after{transform:rotate(-135deg)}
-.song-now{font-weight:700;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.song-list{display:grid;gap:8px;margin-top:8px}
-.song{justify-content:flex-start;text-align:left;width:100%}
-.song .dur{margin-left:auto;color:var(--muted);font-variant-numeric:tabular-nums;flex:none}
-.song.on{border-color:var(--tape)}
-.song.on::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--tape-fill);flex:none}
 #srcNote:empty{display:none}
 .empty code{font-size:13px;color:var(--fg)}
-.empty .or{font-size:13px;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;font-weight:700}
