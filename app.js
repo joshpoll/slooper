@@ -47,12 +47,16 @@ const useSnap=()=>S.beats.length>0;
 const oneIdx=()=>S.one;
 const countOf=(i,one)=>(((i-one)%8)+8)%8; // 0 means "1"
 function snap(t){if(useSnap())return S.beats[nearestBeatIdx(t)];return Math.round(t*10)/10}
-// Undo: a stack of earlier {a,b}. Callers grab mark() before a change and pass it to record() after, so one gesture is one entry.
-let undos=[];
-const mark=()=>({a:S.a,b:S.b});
-function record(m){if(m.a===S.a&&m.b===S.b)return;undos.push(m);if(undos.length>50)undos.shift();$('undo').disabled=false}
-function clearUndo(){undos=[];$('undo').disabled=true}
-function undo(){const m=undos.pop();if(m){S.a=m.a;S.b=m.b;render();save()}$('undo').disabled=!undos.length}
+// Undo and redo: one history of settings snapshots (loop, lead-in, speed); zoom and scroll are view state and stay out.
+// Callers grab mark() before a change and pass it to record() after, so one gesture is one entry. A new change clears redo.
+const SET=['a','b','leadBeats','rate'];
+let undos=[],redos=[];
+const mark=()=>{const m={};for(const k of SET)m[k]=S[k];return m};
+const hist=()=>{$('undo').disabled=!undos.length;$('redo').disabled=!redos.length};
+function record(m){if(SET.every(k=>m[k]===S[k]))return;undos.push(m);if(undos.length>50)undos.shift();redos=[];hist()}
+function clearUndo(){undos=[];redos=[];hist()}
+function step(from,to){const m=from.pop();if(m){to.push(mark());Object.assign(S,m);applyRate();render();save()}hist()}
+const undo=()=>step(undos,redos),redo=()=>step(redos,undos);
 // With no loop, setting A or B makes a new loop of about 8 beats (4 s without beats) on the far side of it.
 const loopLen=()=>8*beatLen();
 function setA(t){const m=mark();if(!hasLoop())S.b=Math.min(S.dur||t,snap(t+loopLen()));S.a=Math.max(0,Math.min(t,S.b-0.5));record(m);render();save()}
@@ -125,10 +129,17 @@ function draw(){
   if(loop){if(S.leadBeats){ctx.fillStyle=tok(cs,'--tape-soft');ctx.globalAlpha=.45;ctx.fillRect(xp,top,xa-xp,H-top);ctx.globalAlpha=1}
     ctx.fillStyle=tok(cs,'--tape-soft');ctx.fillRect(xa,top,xb-xa,H-top)}
   const mu=tok(cs,'--muted'),pps=W/span;
+  // Time readout, one path for mouse and touch. While dragging A or B: the marker's time, set beside the marker on the outside
+  // (left of A, right of B, flipped at the edges) so the finger on the tab never covers it. Otherwise, with a mouse hovering:
+  // the time a click would seek to, centred on the pointer like YouTube's progress bar.
+  const dm=drag&&(drag.what==='a'||drag.what==='b')?drag.what:null,rx=dm?X(S[dm]):hoverX;let rd=null;
+  if(rx!==null){const lab=mss(Math.max(0,Math.floor(dm?S[dm]:v0+rx/W*span)));ctx.font='700 11px '+tok(cs,'--body');
+    const w=ctx.measureText(lab).width+10,tl=dm==='a'?xa-1:bTagX(xa,xb)-TAGW+1,left=tl-24-w,right=tl+TAGW+24; // 24 px clear of the dragged tab
+    let bx=!dm?rx-w/2:dm==='a'?(left>=0?left:right):(right+w<=W?right:left);bx=Math.max(0,Math.min(W-w,bx));rd={lab,w,bx}}
   // time ruler: m:ss labels at the first spacing on the ladder that leaves room for them
   {const st=TICKS.find(s=>s*pps>=48)||600;ctx.font='600 11px '+tok(cs,'--body');ctx.textAlign='center';ctx.textBaseline='middle';
     for(let k=Math.ceil(v0/st)*st;k<=v1;k+=st){const x=X(k);ctx.fillStyle=tok(cs,'--line');ctx.fillRect(Math.round(x),top-4,1,4);
-      if(x>12&&x<W-12&&(hoverX===null||Math.abs(x-hoverX)>36)){ctx.fillStyle=mu;ctx.fillText(mss(k),x,top-11)}}
+      if(x>12&&x<W-12&&!(rd&&x>rd.bx-18&&x<rd.bx+rd.w+18)){ctx.fillStyle=mu;ctx.fillText(mss(k),x,top-11)}}
     ctx.textBaseline='alphabetic'}
   // beat grid: a line on each "1" only
   const sp=8*beatLen()*pps; // pixels per eight-count
@@ -149,11 +160,9 @@ function draw(){
     ctx.fillStyle=tok(cs,'--tape-fill');ctx.fillRect(xa-1,0,TAGW,18);if(showB)ctx.fillRect(xt-TAGW+1,0,TAGW,18);
     ctx.fillStyle=tok(cs,'--tape-ink');ctx.font='700 12px '+tok(cs,'--body');ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('A',xa+9,9.5);if(showB)ctx.fillText('B',xt-9,9.5);ctx.textBaseline='alphabetic'}
   ctx.fillStyle=tok(cs,'--head');ctx.fillRect(Math.round(X(Yt.time()))-1,top-4,2,H-top+4);
-  // mouse hover: the time a click would seek to, like YouTube's progress bar
-  if(hoverX!==null){const x=Math.round(hoverX),lab=mss(Math.max(0,Math.floor(v0+hoverX/W*span)));ctx.font='700 11px '+tok(cs,'--body');
-    const w=ctx.measureText(lab).width+10,bx=Math.max(0,Math.min(W-w,x-w/2));
-    ctx.fillStyle=tok(cs,'--fg');ctx.globalAlpha=.5;ctx.fillRect(x,top-4,1,H-top+4);ctx.globalAlpha=1;
-    ctx.fillRect(bx,top-19,w,16);ctx.fillStyle=tok(cs,'--bg');ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(lab,bx+w/2,top-11);ctx.textBaseline='alphabetic'}
+  // the time readout (see rd above); a hover also gets a faint line at the pointer, while a dragged marker is its own line
+  if(rd){ctx.fillStyle=tok(cs,'--fg');if(!dm){ctx.globalAlpha=.5;ctx.fillRect(Math.round(rx),top-4,1,H-top+4);ctx.globalAlpha=1}
+    ctx.font='700 11px '+tok(cs,'--body');ctx.fillRect(rd.bx,top-19,rd.w,16);ctx.fillStyle=tok(cs,'--bg');ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(rd.lab,rd.bx+rd.w/2,top-11);ctx.textBaseline='alphabetic'}
 }
 
 /* ---------- UI ---------- */
@@ -162,7 +171,8 @@ function render(){
   $('fitLoop').disabled=!loop;
   if(document.activeElement!==$('speedVal'))$('speedVal').value=S.rate+'%';$('speed').value=S.rate;$('speedBtn').textContent=S.rate+'%';
   for(const b of $('speedPop').querySelectorAll('[data-rate]'))b.setAttribute('aria-pressed',+b.dataset.rate===S.rate);
-  for(const b of document.querySelectorAll('#leadSeg button')){b.setAttribute('aria-pressed',+b.dataset.n===S.leadBeats);b.disabled=!loop}
+  for(const b of $('leadSeg').querySelectorAll('[data-n]'))b.setAttribute('aria-pressed',+b.dataset.n===S.leadBeats);
+  $('leadBtn').textContent=S.leadBeats;$('leadBtn').disabled=!loop;
   dirty=true;
 }
 
@@ -298,21 +308,22 @@ canvas.addEventListener('wheel',ev=>{
 // Restart goes back to the start of the round and keeps playing or stays paused
 function restart(){if(Yt.paused()){followHere();Yt.seek(pre())}else{startLoop();lockScreen()}}
 $('play').onclick=togglePlay;$('restart').onclick=restart;
-$('speed').oninput=e=>setRate(+e.target.value);
-for(const b of document.querySelectorAll('#leadSeg button'))b.onclick=()=>{S.leadBeats=+b.dataset.n;render();save()};
-$('undo').onclick=undo;
+{let m=null;$('speed').oninput=e=>{m=m||mark();setRate(+e.target.value)};$('speed').onchange=()=>{if(m)record(m);m=null}}
+for(const b of $('leadSeg').querySelectorAll('[data-n]'))b.onclick=()=>{const m=mark();S.leadBeats=+b.dataset.n;record(m);render();save()};
+$('undo').onclick=undo;$('redo').onclick=redo;
 // Typed speed: the percentage is an input. Commit on Enter or blur (setRate clamps and rounds); Escape or junk reverts.
 {const sv=$('speedVal');let cancel=false;
   sv.addEventListener('focus',()=>{cancel=false;sv.value=S.rate;sv.select()});
   sv.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();sv.blur()}else if(e.key==='Escape'){cancel=true;sv.blur()}});
-  sv.addEventListener('blur',()=>{const n=parseFloat(sv.value);if(!cancel&&isFinite(n))setRate(n);else render()})}
-// Speed popover, like the Apple Podcasts speed menu: preset chips, plus a slider and the typed percentage for any other speed.
-{const btn=$('speedBtn'),pop=$('speedPop');
-  const show=open=>{pop.hidden=!open;btn.setAttribute('aria-expanded',open)};
-  btn.onclick=()=>show(pop.hidden);
-  for(const b of pop.querySelectorAll('[data-rate]'))b.onclick=()=>setRate(+b.dataset.rate);
-  document.addEventListener('pointerdown',e=>{if(!pop.hidden&&!pop.contains(e.target)&&!btn.contains(e.target))show(false)});
-  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!pop.hidden){show(false);btn.focus()}})}
+  sv.addEventListener('blur',()=>{const n=parseFloat(sv.value);if(!cancel&&isFinite(n)){const m=mark();setRate(n);record(m)}else render()})}
+// Chip menus (lead-in, speed): the chip toggles its popover; an outside tap or Escape closes it; one open at a time.
+// Speed is like the Apple Podcasts speed menu: preset chips, plus a slider and the typed percentage for any other speed.
+const menus=[...document.querySelectorAll('.menu')].map(m=>({btn:m.querySelector('.chip'),pop:m.querySelector('.pop')}));
+function closeMenus(){for(const m of menus){m.pop.hidden=true;m.btn.setAttribute('aria-expanded',false)}}
+for(const m of menus)m.btn.onclick=()=>{const open=m.pop.hidden;closeMenus();m.pop.hidden=!open;m.btn.setAttribute('aria-expanded',open)};
+document.addEventListener('pointerdown',e=>{if(!e.target.closest('.menu'))closeMenus()});
+document.addEventListener('keydown',e=>{const m=menus.find(m=>!m.pop.hidden);if(e.key==='Escape'&&m){closeMenus();m.btn.focus()}});
+for(const b of $('speedPop').querySelectorAll('[data-rate]'))b.onclick=()=>{const m=mark();setRate(+b.dataset.rate);record(m)};
 $('zOut').onclick=()=>zoom(-1);$('zIn').onclick=()=>zoom(1);$('fitLoop').onclick=fitLoop;$('fitSong').onclick=fitSong;
 $('recenter').onclick=()=>setFollow(FOLLOW);
 // Space plays and pauses. A second Space within 300 ms, with a loop, restarts from the loop start instead.
@@ -320,9 +331,9 @@ let lastSpace=0;
 document.addEventListener('keydown',e=>{if(e.code!=='Space'||!S.dur||/INPUT|BUTTON|TEXTAREA|SELECT/.test(e.target.tagName))return;
   e.preventDefault();if(e.repeat)return;const now=performance.now();
   if(hasLoop()&&now-lastSpace<300){lastSpace=0;startLoop();lockScreen()}else{lastSpace=now;togglePlay()}});
-// [ and ] set A and B to the playhead (with no loop, they make an 8-beat loop). Cmd/Ctrl+Z undoes. Not while typing in a field.
+// [ and ] set A and B to the playhead (with no loop, they make an 8-beat loop). Cmd/Ctrl+Z undoes, with Shift redoes. Not while typing in a field.
 document.addEventListener('keydown',e=>{if(!S.dur||/INPUT|TEXTAREA|SELECT/.test(e.target.tagName))return;
-  if((e.metaKey||e.ctrlKey)&&!e.shiftKey&&!e.altKey&&e.key.toLowerCase()==='z'){e.preventDefault();undo();return}
+  if((e.metaKey||e.ctrlKey)&&!e.altKey&&e.key.toLowerCase()==='z'){e.preventDefault();(e.shiftKey?redo:undo)();return}
   if(e.metaKey||e.ctrlKey||e.altKey)return;
   if(e.key==='['){e.preventDefault();setA(snap(Yt.time()))}else if(e.key===']'){e.preventDefault();setB(snap(Yt.time()))}});
 new ResizeObserver(resize).observe($('cwrap'));

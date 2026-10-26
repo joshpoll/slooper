@@ -23,7 +23,7 @@ header{padding-top:env(safe-area-inset-top,0px)}
 /* the slug from the Slugah logo, smiling under the loop */
 .brand .smile{position:absolute;left:calc(50% - 13.93px);top:calc(100% + 2.73px);width:24.36px;aspect-ratio:513/228;transform:rotate(-1.9deg);pointer-events:none}
 
-button,.picker{font:inherit;color:var(--fg);background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 14px;cursor:pointer;-webkit-tap-highlight-color:transparent;display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:44px}
+button,.picker{font:inherit;color:var(--fg);background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 14px;cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation;display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:44px}
 button:active{transform:translateY(1px)}
 button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--tape);outline-offset:2px}
 /* song picker: a native select (the system picker on iPhone), truncated with an ellipsis when the title is long */
@@ -49,12 +49,14 @@ main{display:grid;gap:14px;padding-block:4px 120px}
 .count{position:absolute;inset:0;display:grid;place-items:center;font-family:var(--display);font-weight:700;font-size:min(30vw,160px);color:var(--stage-fg);text-shadow:0 2px 24px rgba(0,0,0,.6);pointer-events:none}
 
 /* waveform */
-.wave-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px}
-.seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
-.seg button{border:0;border-radius:0;min-height:36px;padding:6px 14px;background:transparent;color:var(--muted)}
-.seg button[aria-pressed="true"]{background:var(--fg);color:var(--bg)}
-.undo button{color:var(--fg)}
-.zoom button{color:var(--fg);padding:6px 11px}.zoom button+button{border-left:1px solid var(--line)}.zoom .zstep{font-size:20px;font-weight:700;min-width:40px;padding:0 6px}
+.wave-head{position:relative;display:flex;align-items:flex-end;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.hist{display:flex;gap:4px;margin-left:auto}
+.icon{min-height:36px;width:36px;padding:0}
+/* phones: two deliberate rows, zoom with undo/redo above, lead-in and speed below */
+@media (max-width:520px){.wave-head{display:grid;grid-template-columns:auto auto 1fr auto;gap:8px 6px}.field{grid-area:1/1/2/4}.hist{grid-area:1/4}.lead{grid-area:2/1}.speed{grid-area:2/2}}
+/* zoom: one strip in the chip style; square + and −, then fit to loop or song */
+.zoom{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.zoom button{min-height:34px;padding:0 10px;border:0;border-radius:0;font-family:var(--display);font-weight:700;font-size:20px;line-height:1}.zoom button+button{border-left:1px solid var(--line)}.zoom .sq{width:34px;padding:0}
 .canvas-wrap{position:relative;touch-action:none}
 .recenter{position:absolute;right:6px;bottom:6px;min-height:32px;padding:4px 12px;font-size:13px;font-weight:700;background:var(--fg);color:var(--bg);border-color:var(--fg);box-shadow:0 2px 8px rgba(0,0,0,.5)}
 canvas{display:block;width:100%;height:136px;border-radius:8px;background:var(--bg);cursor:text;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
@@ -71,16 +73,17 @@ canvas{display:block;width:100%;height:136px;border-radius:8px;background:var(--
 
 button:disabled{opacity:.4;cursor:default}
 
-/* speed: a button in the timeline header that opens a small menu of presets plus a custom slider */
-.lead{margin-left:auto;align-items:center}.lead span{padding:0 4px 0 10px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:700}.lead button{min-width:40px;padding:6px 8px}
-.lead button[aria-pressed="true"]{background:var(--tape-fill);color:var(--tape-ink)}
-.speed{position:relative}
-.speed-btn{min-height:36px;padding:4px 10px 4px 12px;font-family:var(--display);font-weight:700;font-size:20px;line-height:1;font-variant-numeric:tabular-nums}
-.speed-btn::after{content:"";width:7px;height:7px;border:solid var(--muted);border-width:0 2px 2px 0;transform:translateY(-2px) rotate(45deg);margin-left:2px}
-.speed-btn[aria-expanded="true"]{border-color:var(--tape)}
-.speed-pop{position:absolute;right:0;top:calc(100% + 6px);z-index:6;width:min(320px,calc(100vw - 48px));box-sizing:border-box;display:grid;gap:10px;
+/* chip menus (lead-in, speed): a chip in the timeline header that opens a small popover of choices, hung from the header's left edge so it never runs off a phone screen */
+.menu,.field{display:flex;flex-direction:column;align-items:flex-start;gap:3px}.speed{margin-left:6px}
+.lead .chip{min-width:57px;justify-content:space-between} /* sized for "16 ▾" so picking 0, 8 or 16 never shifts the row */
+.chip{min-height:36px;padding:4px 8px 4px 10px;font-family:var(--display);font-weight:700;font-size:20px;line-height:1;font-variant-numeric:tabular-nums}
+.chip::after{content:"";width:7px;height:7px;border:solid var(--muted);border-width:0 2px 2px 0;transform:translateY(-2px) rotate(45deg);margin-left:2px}
+.chip[aria-expanded="true"]{border-color:var(--tape)}
+/* a small muted caption over a chip says what it sets */
+.tag{padding-left:2px;font:700 10px/1 var(--body);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.pop{position:absolute;left:0;top:calc(100% + 6px);z-index:6;width:min(320px,100%);box-sizing:border-box;display:grid;gap:10px;
   background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px;box-shadow:0 10px 30px rgba(0,0,0,.6)}
-.presets{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.presets{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:6px}
 .presets button{padding:0;font-family:var(--display);font-weight:700;font-size:20px;font-variant-numeric:tabular-nums;background:var(--bg)}
 .presets button[aria-pressed="true"]{background:var(--tape-fill);border-color:var(--tape-fill);color:var(--tape-ink)}
 .custom{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:10px}

@@ -49,18 +49,18 @@
 
     <div class="panel">
       <div class="wave-head">
-        <div class="seg zoom" role="group" aria-label="Timeline zoom">
-          <button id="zOut" class="zstep" aria-label="Zoom out">−</button>
-          <button id="zIn" class="zstep" aria-label="Zoom in">+</button>
-          <button id="fitLoop" title="Show the whole loop">Fit loop</button>
-          <button id="fitSong" title="Show the whole song">Fit song</button>
+        <div class="field"><span class="tag" id="zoomTag">Zoom</span><div class="zoom" role="group" aria-labelledby="zoomTag"><button id="zIn" class="sq" aria-label="Zoom in" title="Zoom in">+</button><button id="zOut" class="sq" aria-label="Zoom out" title="Zoom out">−</button><button id="fitLoop" title="Show the whole loop">Loop</button><button id="fitSong" title="Show the whole song">Song</button></div></div>
+        <div class="menu lead">
+          <span class="tag" id="leadTag">Lead-in</span>
+          <button id="leadBtn" class="chip" aria-haspopup="dialog" aria-expanded="false" aria-controls="leadPop" aria-labelledby="leadTag leadBtn" title="Lead-in beats before A">8</button>
+          <div id="leadPop" class="pop" role="dialog" aria-label="Lead-in" hidden>
+            <div class="presets" id="leadSeg" role="group" aria-label="Lead-in beats"><button data-n="0" aria-pressed="false">0</button><button data-n="8" aria-pressed="true">8</button><button data-n="16" aria-pressed="false">16</button></div>
+          </div>
         </div>
-        <div class="seg undo"><button id="undo" disabled title="Undo the last loop change">Undo</button></div>
-        <div class="seg lead" id="leadSeg" role="group" aria-label="Lead-in beats before A"><span>Lead-in</span><button data-n="0">0</button><button data-n="8">8</button><button data-n="16">16</button></div>
-        <div class="speed">
-          <button id="speedBtn" class="speed-btn" aria-haspopup="dialog" aria-expanded="false" aria-controls="speedPop" title="Playback speed">100%</button>
-          <div id="speedPop" class="speed-pop" role="dialog" aria-label="Speed" hidden>
-            <span class="label">Speed</span>
+        <div class="menu speed">
+          <span class="tag" id="speedTag">Speed</span>
+          <button id="speedBtn" class="chip" aria-haspopup="dialog" aria-expanded="false" aria-controls="speedPop" aria-labelledby="speedTag speedBtn" title="Playback speed">100%</button>
+          <div id="speedPop" class="pop" role="dialog" aria-label="Speed" hidden>
             <div class="presets" role="group" aria-label="Preset speeds">
               <button data-rate="70" aria-pressed="false">70%</button>
               <button data-rate="90" aria-pressed="false">90%</button>
@@ -73,6 +73,10 @@
               <input id="speedVal" class="speed-val" type="text" inputmode="numeric" autocomplete="off" value="100%" aria-label="Speed in percent. Tap to type.">
             </div>
           </div>
+        </div>
+        <div class="hist">
+          <button id="undo" class="icon" disabled aria-label="Undo" title="Undo (⌘Z)"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg></button>
+          <button id="redo" class="icon" disabled aria-label="Redo" title="Redo (⇧⌘Z)"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 14 5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/></svg></button>
         </div>
       </div>
       <div id="rateNote" class="note rate-note"></div>
@@ -91,6 +95,7 @@
     <dt><kbd>Space</kbd> <kbd>Space</kbd></dt><dd>Restart loop</dd>
     <dt><kbd>[</kbd> <kbd>]</kbd></dt><dd>A / B to playhead</dd>
     <dt><kbd>⌘Z</kbd></dt><dd>Undo</dd>
+    <dt><kbd>⇧⌘Z</kbd></dt><dd>Redo</dd>
     <dt>Click</dt><dd>Seek</dd>
     <dt>Drag</dt><dd>Make a loop</dd>
     <dt><kbd>Shift</kbd> click</dt><dd>Extend loop</dd>
@@ -99,7 +104,7 @@
     <dt>Scroll ↔</dt><dd>Pan</dd>
     <dt>Scroll ↕, pinch</dt><dd>Zoom</dd>
   </dl>
-  <p><b>Undo</b> steps back loop changes. <b>Lead-in</b> counts 0, 8 or 16 beats before A. <b>100%</b> opens the speed menu.</p>
+  <p><b>Undo</b> and <b>Redo</b> step through changes to the loop, lead-in and speed. <b>Lead-in</b> counts 0, 8 or 16 beats before A. <b>Speed</b> opens the speed menu. <b>+</b> and <b>−</b> zoom, and <b>Loop</b> and <b>Song</b> fit the timeline to the loop or the whole song.</p>
 </aside>
 
 <nav class="transport" id="transport" hidden><div class="wrap tr-in">
