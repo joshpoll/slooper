@@ -1,4 +1,4 @@
-/* Layout: one rehearsal column with a fixed transport bar you can hit from across the room. Slugah colors: black ground, red marks the loop and the count. */
+/* Layout: one rehearsal column with a fixed transport bar you can hit from across the room. Slugah colors: black ground with a faint slug tile, red marks the loop and the count. */
 :root{
   --bg:#0a0909; --surface:#151314; --fg:#f4eeee; --muted:#9b9092; --line:#2f2a2b;
   --tape:#e5232d; --tape-fill:#e5232d; --tape-soft:rgba(229,35,45,.20); --tape-ink:#ffffff;
@@ -10,16 +10,18 @@
 
 [hidden]{display:none!important}
 html{-webkit-text-size-adjust:100%}
-body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--body);font-size:15px;line-height:1.45}
+body{margin:0;background:var(--bg) url("img/slug-tile.svg") 0 0/190px 220px;color:var(--fg);font-family:var(--body);font-size:15px;line-height:1.45}
 .wrap{max-width:720px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
 header{padding-top:env(safe-area-inset-top,0px)}
 .top-in{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-block:14px}
 .brand{font-family:var(--display);font-weight:700;font-size:22px;letter-spacing:.02em;text-transform:uppercase}
-.brand{display:inline-flex;align-items:center;gap:8px}.brand svg{width:34px;height:20px;flex:none}.brand i{font-style:normal;color:var(--tape);background:var(--tape-soft);padding:0 4px;margin:0 5px;position:relative}
+.brand{display:inline-flex;align-items:center}.brand i{font-style:normal;color:var(--tape);background:var(--tape-soft);padding:0 4px;margin:0 5px;position:relative}
 /* the loop's A/B markers, drawn like the timeline's: a bar with a square tag at the top facing into the loop */
 .brand i::before,.brand i::after{position:absolute;bottom:0;top:-13px;width:12px;font:700 9px/12px var(--body);color:var(--tape-ink);text-align:center}
 .brand i::before{content:"A";left:-1px;background:linear-gradient(var(--tape),var(--tape)) left top/12px 12px no-repeat,linear-gradient(var(--tape),var(--tape)) left/2px 100% no-repeat}
 .brand i::after{content:"B";right:-1px;background:linear-gradient(var(--tape),var(--tape)) right top/12px 12px no-repeat,linear-gradient(var(--tape),var(--tape)) right/2px 100% no-repeat}
+/* the slug from the Slugah logo, smiling under the loop */
+.brand .smile{position:absolute;left:calc(50% - 13.93px);top:calc(100% + 2.73px);width:24.36px;aspect-ratio:513/228;transform:rotate(-1.9deg);pointer-events:none}
 
 button,.picker{font:inherit;color:var(--fg);background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 14px;cursor:pointer;-webkit-tap-highlight-color:transparent;display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:44px}
 button:active{transform:translateY(1px)}

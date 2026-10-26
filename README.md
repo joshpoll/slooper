@@ -56,7 +56,7 @@ python3 -m http.server
 
 Then go to http://localhost:8000. YouTube needs the page to come from a web address, so opening `index.html` as a file won't work.
 
-The app is three files: `index.html`, `style.css` and `app.js`. The icons in `icons/` were made from `icons/icon.svg` with `rsvg-convert`.
+The app is three files: `index.html`, `style.css` and `app.js`. The home-screen icons in `icons/` were made from `icons/icon.svg` with `rsvg-convert`. The browser-tab icon is `icons/favicon.svg` (and `favicon-32.png` from it), a filled-in version of the same slug that stays readable at 16px. The header slug and the background tile are in `img/`.
 
 ## Deploying
 
